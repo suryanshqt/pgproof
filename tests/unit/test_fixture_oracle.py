@@ -7,6 +7,8 @@ rather than executing them.
 import ast
 import filecmp
 import re
+import tomllib
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +44,19 @@ MAY_DIFFER = frozenset(
 )
 BROKEN_ONLY = frozenset({"MEASUREMENT.md"})
 
+# Reproducing a fixture by hand creates .venv and tool caches inside it. Walking
+# those made the divergence check fail for anyone who followed the documented
+# procedure, and their contents differ per machine.
+IGNORED_DIRS = frozenset(
+    {
+        "__pycache__",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+    }
+)
+
 # A measured quantity in an oracle would be a fabricated performance claim.
 MEASUREMENT_UNIT = re.compile(r"\d+(?:\.\d+)?\s*(?:ms|µs|us|sec|seconds|%)\b", re.IGNORECASE)
 MEASUREMENT_WORD = re.compile(
@@ -60,8 +75,14 @@ def relative_files(fixture: Path) -> set[str]:
     return {
         str(path.relative_to(fixture))
         for path in fixture.rglob("*")
-        if path.is_file() and "__pycache__" not in path.parts
+        if path.is_file() and IGNORED_DIRS.isdisjoint(path.parts)
     }
+
+
+def fixture_sources(fixture: Path) -> Iterator[str]:
+    for path in sorted(fixture.rglob("*.py")):
+        if IGNORED_DIRS.isdisjoint(path.parts):
+            yield path.read_text(encoding="utf-8")
 
 
 @pytest.fixture(scope="module")
@@ -148,10 +169,8 @@ def test_clean_differs_from_broken_only_in_the_planted_cases() -> None:
 
 
 def test_every_planted_case_is_anchored_in_broken_but_not_in_clean() -> None:
-    clean_text = "\n".join(path.read_text(encoding="utf-8") for path in sorted(CLEAN.rglob("*.py")))
-    broken_text = "\n".join(
-        path.read_text(encoding="utf-8") for path in sorted(BROKEN.rglob("*.py"))
-    )
+    clean_text = "\n".join(fixture_sources(CLEAN))
+    broken_text = "\n".join(fixture_sources(BROKEN))
     for case_id in PLANTED_CASES:
         assert case_id in broken_text, f"{case_id} is not marked in demo-broken source"
         assert case_id not in clean_text, f"{case_id} marker leaked into demo-clean source"
@@ -159,10 +178,10 @@ def test_every_planted_case_is_anchored_in_broken_but_not_in_clean() -> None:
 
 @pytest.mark.parametrize("fixture", [BROKEN, CLEAN], ids=["demo-broken", "demo-clean"])
 def test_fixture_python_is_syntactically_valid(fixture: Path) -> None:
-    sources = sorted(fixture.rglob("*.py"))
+    sources = list(fixture_sources(fixture))
     assert sources
-    for path in sources:
-        ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for source in sources:
+        ast.parse(source)
 
 
 def test_benchmark_corpus_pins_every_repository_by_commit() -> None:
@@ -173,3 +192,46 @@ def test_benchmark_corpus_pins_every_repository_by_commit() -> None:
         assert re.fullmatch(r"[0-9a-f]{40}", repository["commit"]), repository["id"]
         assert repository["url"].startswith("https://github.com/")
         assert repository["role"]
+
+
+# The audit that produced these guards found the reverse of each: a digest
+# recorded but never used, and ranges standing in for the measured versions.
+PINNED_CLIENTS = ("sqlalchemy", "alembic", "psycopg", "pytest")
+
+
+def test_measurement_notes_pin_postgres_by_digest() -> None:
+    text = (BROKEN / "MEASUREMENT.md").read_text(encoding="utf-8")
+    corpus = yaml.safe_load((FIXTURES / "benchmark-corpus.yaml").read_text(encoding="utf-8"))
+    digest = corpus["runtime"]["postgres_digest"]
+    assert f"postgres@{digest}" in text
+    assert not re.search(r"\bpostgres:\d", text), "floating image tag in the procedure"
+    assert not re.search(r"\bpostgres:\d", yaml.safe_dump(corpus["runtime"]))
+
+
+@pytest.mark.parametrize("fixture", [BROKEN, CLEAN], ids=["demo-broken", "demo-clean"])
+def test_fixture_declares_exact_pins_and_ships_a_lockfile(fixture: Path) -> None:
+    manifest = tomllib.loads((fixture / "pyproject.toml").read_text(encoding="utf-8"))
+    declared = manifest["project"]["dependencies"] + manifest["dependency-groups"]["dev"]
+    assert declared
+    for requirement in declared:
+        assert "==" in requirement, f"{requirement} is not an exact pin"
+    assert (fixture / "uv.lock").is_file()
+    assert (fixture / ".python-version").is_file()
+
+
+def test_both_fixtures_share_one_locked_client_stack() -> None:
+    assert (BROKEN / "uv.lock").read_bytes() == (CLEAN / "uv.lock").read_bytes()
+    assert (BROKEN / ".python-version").read_text() == (CLEAN / ".python-version").read_text()
+
+
+def test_measured_environment_matches_the_fixture_lockfile() -> None:
+    lock = tomllib.loads((BROKEN / "uv.lock").read_text(encoding="utf-8"))
+    locked = {p["name"]: p["version"] for p in lock["package"]}
+    environment = (BROKEN / "MEASUREMENT.md").read_text(encoding="utf-8")
+    for name in PINNED_CLIENTS:
+        version = locked[name]
+        assert re.search(rf"{name} {re.escape(version)}\b", environment, re.IGNORECASE), (
+            f"MEASUREMENT.md does not attribute its numbers to {name} {version}"
+        )
+    python_version = (BROKEN / ".python-version").read_text().strip()
+    assert f"| Python | {python_version}" in environment

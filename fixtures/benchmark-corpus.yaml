@@ -7,9 +7,12 @@ corpus_version: 1
 
 runtime:
   # The PostgreSQL identity every fixture measurement is taken against.
-  postgres_image: postgres:17
+  # Reference the digest, never a floating version tag. A tag moves and
+  # would silently reattribute a measurement to a different server build.
+  postgres_image: postgres@sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675
   postgres_digest: sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675
   postgres_server_version: 17.11 (Debian 17.11-1.pgdg13+2)
+  fixture_client_lock: fixtures/demo-broken/uv.lock
 
 repositories:
   - id: full-stack-fastapi-template
