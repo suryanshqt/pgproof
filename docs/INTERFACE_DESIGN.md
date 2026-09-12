@@ -474,7 +474,7 @@ Screenshot changes require explicit review; snapshots are not blindly updated.
 
 ## 16. Interface PR gates
 
-- `BE-01` establishes terminal capability detection and snapshot harness.
+- `BE-05` establishes terminal capability detection and snapshot harness.
 - `BE-02` freezes artifact vocabulary and status enums.
 - `FE-01` establishes tokens, app shell, accessibility, and screenshot harness.
 - `FE-02` validates the schema graph on real fixture sizes before more screens.

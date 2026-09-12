@@ -55,7 +55,7 @@ VIRTUAL_ENV=/tmp/pgproof-wheel-check uv pip install --no-cache dist/*.whl
 /tmp/pgproof-wheel-check/bin/pgproof --help
 ```
 
-CI runs the same gate on Linux amd64 (`ubuntu-latest`) and macOS arm64 (`macos-14`)
+CI runs the same gate on Linux amd64 (`ubuntu-latest`) and macOS arm64 (`macos-15`)
 across Python 3.11 and 3.13.
 
 ## Repository layout
