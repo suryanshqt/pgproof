@@ -1,0 +1,22 @@
+[project]
+name = "storefront"
+version = "0.1.0"
+description = "Deliberately defective multi-tenant storefront used as pgproof ground truth"
+requires-python = ">=3.11"
+# Pinned exactly, and locked in uv.lock, because MEASUREMENT.md attributes
+# measured numbers to these versions. A range would let a reproducer install a
+# different client and still believe the recorded numbers apply.
+dependencies = [
+  "alembic==1.20.0",
+  "psycopg[binary]==3.3.5",
+  "sqlalchemy==2.0.52",
+]
+
+[dependency-groups]
+dev = ["pytest==9.1.1"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = ["-ra"]

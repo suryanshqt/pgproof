@@ -83,6 +83,34 @@ roadmap item that owns them lands; this repository does not pre-create empty lay
 The check fails closed: a new top-level package under `src/pgproof/` must be given an
 explicit rule in `ALLOWED_INTERNAL` and `BANNED_EXTERNAL` before its tests pass.
 
+## Ground-truth fixtures
+
+`fixtures/` holds the broken and clean demo repositories that the rule engine is
+judged against, plus their `EXPECTED.yaml` oracles. See
+[`fixtures/README.md`](fixtures/README.md).
+
+They are analysed as data. They are never imported or installed by this
+repository's test suite, and they are excluded from Ruff; mypy and pytest do not
+reach them because both are scoped to `src` and `tests`. Do not lint or reformat
+them, because that would erase the defects they exist to carry.
+
+`tests/unit/test_fixture_oracle.py` enforces the fixture contract without
+executing fixture code: every oracle source reference must resolve to real text,
+`demo-clean` must report no headline finding, the two fixtures must differ only in
+the planted cases, and no `EXPECTED.yaml` may state a measured quantity.
+
+To work on the fixtures by hand you need Docker. Each fixture carries its own
+`pyproject.toml`, `.python-version`, and `uv.lock` pinning SQLAlchemy, Alembic,
+psycopg, and pytest exactly; none of them is a dependency of pgproof itself. Run
+`uv sync --all-groups --frozen` inside the fixture directory, never a fresh
+resolution, and start PostgreSQL from the recorded image digest rather than the
+floating version tag. The exact procedure is in
+[`fixtures/demo-broken/MEASUREMENT.md`](fixtures/demo-broken/MEASUREMENT.md).
+
+Measured numbers are attributed to those pins, so changing them invalidates
+`MEASUREMENT.md`. Re-measure and record what you observe; never carry a number
+forward across a stack change.
+
 ## Branches and pull requests
 
 Branch and title conventions come from

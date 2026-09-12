@@ -1,0 +1,137 @@
+# Ground-truth oracle for the demo-broken fixture.
+#
+# Every entry states what pgproof MUST conclude about this repository and which
+# evidence category the conclusion may claim. Measured values live in
+# MEASUREMENT.md, never here, so this file cannot drift into asserting numbers
+# that were not measured.
+oracle_version: 1
+fixture: demo-broken
+role: defective
+description: >-
+  Multi-tenant storefront carrying four planted design defects: one tenant
+  ownership gap, two missing indexes, and one observed N+1.
+
+schema:
+  tables: [order_items, orders, products, tenants, users]
+  alembic_head: 6a912ef4c1b8
+  alembic_revisions: [b7c41d92a8f3, 6a912ef4c1b8]
+
+headline_findings:
+  - id: TENANT-001
+    title: Enforce tenant ownership for orders
+    category: tenancy
+    priority: required_for_correctness
+    evidence: observed
+    verifiable: false
+    rule_family: schema_integrity
+    expectation: >-
+      app/models.py declares Order.tenant_id as a foreign key to tenants.id and
+      declares an Order.tenant relationship, but migration 6a912ef4c1b8 creates
+      the column without a foreign key, so PostgreSQL does not enforce that an
+      order belongs to an existing tenant.
+    physical_relationship_present: false
+    orm_relationship_present: true
+    sources:
+      - path: app/models.py
+        anchor: 'ForeignKey("tenants.id", ondelete="RESTRICT")'
+      - path: migrations/versions/0002_create_orders.py
+        anchor: TENANT-001
+    absent_from_catalog:
+      - constraint: fk_orders_tenant_id
+        table: orders
+
+  - id: IDX-001
+    title: Index orders.user_id for the user order history
+    category: workload_index
+    priority: worth_evaluating
+    evidence: inferred
+    verifiable: true
+    rule_family: workload_index
+    candidate_kind: single_column_btree
+    expectation: >-
+      list_user_orders filters orders on user_id, a foreign key column with no
+      index, so the operation reads the whole orders table.
+    operation: app/repositories.py::list_user_orders
+    proposed_index:
+      table: orders
+      columns: [user_id]
+      method: btree
+    sources:
+      - path: app/repositories.py
+        anchor: IDX-001
+      - path: migrations/versions/0002_create_orders.py
+        anchor: IDX-001
+    absent_from_catalog:
+      - index: ix_orders_user_id
+        table: orders
+
+  - id: IDX-002
+    title: Add a composite index for the tenant order list
+    category: workload_index
+    priority: worth_evaluating
+    evidence: inferred
+    verifiable: true
+    rule_family: workload_index
+    candidate_kind: composite_btree
+    expectation: >-
+      list_tenant_orders filters orders on tenant_id and status and sorts by
+      created_at descending. No index supports that equality prefix followed by
+      the ordered column, so the operation scans and sorts the whole table.
+    operation: app/repositories.py::list_tenant_orders
+    proposed_index:
+      table: orders
+      columns: [tenant_id, status, created_at DESC]
+      method: btree
+    sources:
+      - path: app/repositories.py
+        anchor: IDX-002
+      - path: migrations/versions/0002_create_orders.py
+        anchor: IDX-002
+    absent_from_catalog:
+      - index: ix_orders_tenant_status_created
+        table: orders
+
+  - id: NPLUS1-001
+    title: Eager-load order items when recomputing totals
+    category: workload_amplification
+    priority: worth_evaluating
+    evidence: observed
+    verifiable: true
+    rule_family: workload_amplification
+    classification: observed_n_plus_one
+    expectation: >-
+      order_totals_by_item iterates the orders returned by list_tenant_orders and
+      touches order.items, which is lazily loaded. One parent query is followed by
+      one child query per order returned.
+    operation: app/repositories.py::order_totals_by_item
+    parent_relation: orders
+    child_relation: order_items
+    supported_treatment: selectinload
+    sources:
+      - path: app/repositories.py
+        anchor: NPLUS1-001
+      - path: app/models.py
+        anchor: 'items: Mapped[list[OrderItem]] = relationship('
+
+must_not_report:
+  - reason: >-
+      order_items.order_id carries both a foreign key and ix_order_items_order_id
+      in this fixture, so no index recommendation may name it.
+    not_finding: index on order_items.order_id
+  - reason: >-
+      orders.status is constrained by ck_orders_status, so the closed-set rule
+      must stay silent.
+    not_finding: unenforced closed set on orders.status
+  - reason: >-
+      Money is stored as integer cents, so the floating-point money rule must stay
+      silent.
+    not_finding: floating point money column
+  - reason: >-
+      users and products are both uniquely constrained per tenant, so the
+      tenant-scoped uniqueness rule must stay silent for them.
+    not_finding: tenant-scoped uniqueness gap on users or products
+
+forbidden_claims:
+  - A replica is required.
+  - Production latency will improve by a stated amount.
+  - Test execution counts represent production request frequency.

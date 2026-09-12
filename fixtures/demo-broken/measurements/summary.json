@@ -1,0 +1,262 @@
+{
+  "summary_version": 1,
+  "derived_from": "run-*.json under this directory",
+  "formulas": {
+    "median": "sorted(samples)[len(samples) // 2], which is index 3 of 7",
+    "iqr_fraction": "(sorted(samples)[5] - sorted(samples)[1]) / median",
+    "drift_fraction": "abs(median_a2 - median_a1) / median_a1",
+    "absolute_saving": "median_a1 - median_b",
+    "ratio": "median_a1 / median_b",
+    "units": "every raw sample is an integer count of microseconds"
+  },
+  "protocol": {
+    "warmups": 3,
+    "samples": 7
+  },
+  "cases": {
+    "IDX-001": {
+      "runs": [
+        {
+          "case_id": "IDX-001",
+          "run": 1,
+          "arms": {
+            "control_a1": {
+              "median_us": 9884.0,
+              "min_us": 9274.0,
+              "max_us": 11565.0,
+              "q1_us": 9287.0,
+              "q3_us": 10293.0,
+              "iqr_fraction": 0.10178065560501821,
+              "mean_us": 9980.42857142857
+            },
+            "treatment_b": {
+              "median_us": 286.0,
+              "min_us": 247.0,
+              "max_us": 296.0,
+              "q1_us": 276.0,
+              "q3_us": 291.0,
+              "iqr_fraction": 0.05244755244755245,
+              "mean_us": 280.85714285714283
+            },
+            "drift_control_a2": {
+              "median_us": 9299.0,
+              "min_us": 8985.0,
+              "max_us": 9369.0,
+              "q1_us": 9039.0,
+              "q3_us": 9343.0,
+              "iqr_fraction": 0.03269168727820196,
+              "mean_us": 9232.714285714286
+            }
+          },
+          "absolute_saving_us": 9598.0,
+          "ratio": 34.55944055944056,
+          "drift_fraction": 0.059186564144071224
+        },
+        {
+          "case_id": "IDX-001",
+          "run": 2,
+          "arms": {
+            "control_a1": {
+              "median_us": 9488.0,
+              "min_us": 9337.0,
+              "max_us": 9910.0,
+              "q1_us": 9372.0,
+              "q3_us": 9652.0,
+              "iqr_fraction": 0.02951096121416526,
+              "mean_us": 9526.57142857143
+            },
+            "treatment_b": {
+              "median_us": 277.0,
+              "min_us": 175.0,
+              "max_us": 317.0,
+              "q1_us": 180.0,
+              "q3_us": 296.0,
+              "iqr_fraction": 0.4187725631768953,
+              "mean_us": 247.71428571428572
+            },
+            "drift_control_a2": {
+              "median_us": 9331.0,
+              "min_us": 9053.0,
+              "max_us": 9487.0,
+              "q1_us": 9110.0,
+              "q3_us": 9431.0,
+              "iqr_fraction": 0.03440145750723395,
+              "mean_us": 9267.0
+            }
+          },
+          "absolute_saving_us": 9211.0,
+          "ratio": 34.25270758122743,
+          "drift_fraction": 0.016547217537942666
+        },
+        {
+          "case_id": "IDX-001",
+          "run": 3,
+          "arms": {
+            "control_a1": {
+              "median_us": 9178.0,
+              "min_us": 8952.0,
+              "max_us": 9897.0,
+              "q1_us": 9076.0,
+              "q3_us": 9309.0,
+              "iqr_fraction": 0.02538679450860754,
+              "mean_us": 9254.857142857143
+            },
+            "treatment_b": {
+              "median_us": 220.0,
+              "min_us": 209.0,
+              "max_us": 241.0,
+              "q1_us": 212.0,
+              "q3_us": 236.0,
+              "iqr_fraction": 0.10909090909090909,
+              "mean_us": 222.14285714285714
+            },
+            "drift_control_a2": {
+              "median_us": 9402.0,
+              "min_us": 9112.0,
+              "max_us": 9640.0,
+              "q1_us": 9232.0,
+              "q3_us": 9635.0,
+              "iqr_fraction": 0.04286322059136354,
+              "mean_us": 9402.57142857143
+            }
+          },
+          "absolute_saving_us": 8958.0,
+          "ratio": 41.71818181818182,
+          "drift_fraction": 0.02440618871213772
+        }
+      ],
+      "ratio_range": [
+        34.25270758122743,
+        41.71818181818182
+      ],
+      "absolute_saving_ms_range": [
+        8.958,
+        9.598
+      ],
+      "max_control_iqr_fraction": 0.10178065560501821,
+      "max_drift_fraction": 0.059186564144071224
+    },
+    "IDX-002": {
+      "runs": [
+        {
+          "case_id": "IDX-002",
+          "run": 1,
+          "arms": {
+            "control_a1": {
+              "median_us": 9758.0,
+              "min_us": 9422.0,
+              "max_us": 10089.0,
+              "q1_us": 9464.0,
+              "q3_us": 9938.0,
+              "iqr_fraction": 0.048575527772084445,
+              "mean_us": 9713.857142857143
+            },
+            "treatment_b": {
+              "median_us": 239.0,
+              "min_us": 228.0,
+              "max_us": 257.0,
+              "q1_us": 230.0,
+              "q3_us": 242.0,
+              "iqr_fraction": 0.0502092050209205,
+              "mean_us": 239.28571428571428
+            },
+            "drift_control_a2": {
+              "median_us": 9908.0,
+              "min_us": 9635.0,
+              "max_us": 10448.0,
+              "q1_us": 9757.0,
+              "q3_us": 10055.0,
+              "iqr_fraction": 0.030076705692369803,
+              "mean_us": 9945.142857142857
+            }
+          },
+          "absolute_saving_us": 9519.0,
+          "ratio": 40.82845188284519,
+          "drift_fraction": 0.015372002459520393
+        },
+        {
+          "case_id": "IDX-002",
+          "run": 2,
+          "arms": {
+            "control_a1": {
+              "median_us": 9878.0,
+              "min_us": 9672.0,
+              "max_us": 10944.0,
+              "q1_us": 9758.0,
+              "q3_us": 10021.0,
+              "iqr_fraction": 0.026624822838631303,
+              "mean_us": 10006.57142857143
+            },
+            "treatment_b": {
+              "median_us": 251.0,
+              "min_us": 237.0,
+              "max_us": 397.0,
+              "q1_us": 248.0,
+              "q3_us": 297.0,
+              "iqr_fraction": 0.1952191235059761,
+              "mean_us": 276.2857142857143
+            },
+            "drift_control_a2": {
+              "median_us": 10083.0,
+              "min_us": 9993.0,
+              "max_us": 10563.0,
+              "q1_us": 10048.0,
+              "q3_us": 10348.0,
+              "iqr_fraction": 0.02975304968759298,
+              "mean_us": 10189.0
+            }
+          },
+          "absolute_saving_us": 9627.0,
+          "ratio": 39.354581673306775,
+          "drift_fraction": 0.020753188904636566
+        },
+        {
+          "case_id": "IDX-002",
+          "run": 3,
+          "arms": {
+            "control_a1": {
+              "median_us": 9934.0,
+              "min_us": 9797.0,
+              "max_us": 10432.0,
+              "q1_us": 9824.0,
+              "q3_us": 10020.0,
+              "iqr_fraction": 0.01973021944835917,
+              "mean_us": 9978.142857142857
+            },
+            "treatment_b": {
+              "median_us": 192.0,
+              "min_us": 186.0,
+              "max_us": 216.0,
+              "q1_us": 189.0,
+              "q3_us": 212.0,
+              "iqr_fraction": 0.11979166666666667,
+              "mean_us": 197.71428571428572
+            },
+            "drift_control_a2": {
+              "median_us": 10265.0,
+              "min_us": 10079.0,
+              "max_us": 10440.0,
+              "q1_us": 10140.0,
+              "q3_us": 10437.0,
+              "iqr_fraction": 0.02893326838772528,
+              "mean_us": 10269.42857142857
+            }
+          },
+          "absolute_saving_us": 9742.0,
+          "ratio": 51.739583333333336,
+          "drift_fraction": 0.033319911415341255
+        }
+      ],
+      "ratio_range": [
+        39.354581673306775,
+        51.739583333333336
+      ],
+      "absolute_saving_ms_range": [
+        9.519,
+        9.742
+      ],
+      "max_control_iqr_fraction": 0.048575527772084445,
+      "max_drift_fraction": 0.033319911415341255
+    }
+  }
+}

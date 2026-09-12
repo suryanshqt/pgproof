@@ -1,0 +1,87 @@
+{
+  "case_id": "NPLUS1-001",
+  "recorded_at": "2026-09-12T13:18:33Z",
+  "operation": "app/repositories.py::order_totals_by_item(session, 7, 'paid')",
+  "counting_method": "SQLAlchemy before_cursor_execute listener; statements beginning SELECT are counted",
+  "fixtures": {
+    "demo-broken": {
+      "orders_returned": 20,
+      "select_statements": 21,
+      "totals_checksum": 199840,
+      "order_ids": [
+        376007,
+        40207,
+        104407,
+        168607,
+        232807,
+        297007,
+        218007,
+        282207,
+        346407,
+        10607,
+        74807,
+        139007,
+        60007,
+        124207,
+        188407,
+        252607,
+        316807,
+        381007,
+        302007,
+        366207
+      ]
+    },
+    "demo-clean": {
+      "orders_returned": 20,
+      "select_statements": 2,
+      "totals_checksum": 199840,
+      "order_ids": [
+        376007,
+        40207,
+        104407,
+        168607,
+        232807,
+        297007,
+        218007,
+        282207,
+        346407,
+        10607,
+        74807,
+        139007,
+        60007,
+        124207,
+        188407,
+        252607,
+        316807,
+        381007,
+        302007,
+        366207
+      ]
+    }
+  },
+  "broken_is_one_plus_n": true,
+  "clean_statement_count": 2,
+  "order_ids_identical": true,
+  "checksums_identical": true,
+  "statements_removed": 19,
+  "dataset": {
+    "orders": 400000,
+    "order_items": 800000,
+    "total_cents_checksum": 1697400000
+  },
+  "server": {
+    "version": "17.11 (Debian 17.11-1.pgdg13+2)",
+    "image_digest": "sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675"
+  },
+  "client": {
+    "python": "3.13.5",
+    "sqlalchemy": "2.0.52",
+    "alembic": "1.20.0",
+    "psycopg": "3.3.5",
+    "pytest": "9.1.1"
+  },
+  "host": {
+    "os": "Darwin",
+    "architecture": "arm64"
+  }
+}
