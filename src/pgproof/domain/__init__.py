@@ -23,6 +23,17 @@ from pgproof.domain.graph import (
     GraphStatus,
     NodeKind,
 )
+from pgproof.domain.identifiers import (
+    column_id,
+    column_names,
+    decode_identity,
+    encode_identity,
+    node_id,
+    node_parts,
+    proof_id,
+    table_id,
+    table_names,
+)
 from pgproof.domain.ir.code import CodeIR, ModelIR, RelationshipIR
 from pgproof.domain.ir.context import ContextAnswer, ContextIR, TenantModel
 from pgproof.domain.ir.schema import ColumnIR, ConstraintIR, IndexIR, SchemaIR, TableIR
@@ -112,9 +123,18 @@ __all__ = [
     "TreatmentKind",
     "VerificationState",
     "WorkloadIR",
+    "column_id",
+    "column_names",
     "data_model_for",
+    "decode_identity",
+    "encode_identity",
     "envelope_model_for",
     "is_compatible",
+    "node_id",
+    "node_parts",
     "parse_artifact",
+    "proof_id",
     "require_supported",
+    "table_id",
+    "table_names",
 ]

@@ -105,7 +105,7 @@
           "default": null
         },
         "id": {
-          "pattern": "^[a-z][a-z0-9_]*::[^\\s\\x00]{1,300}$",
+          "pattern": "^[a-z][a-z0-9_]*::[^\\x00]{1,300}$",
           "title": "Id",
           "type": "string"
         },
@@ -142,6 +142,8 @@
         "tables_read": {
           "default": [],
           "items": {
+            "description": "Schema-qualified table identity: two logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+            "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
             "type": "string"
           },
           "title": "Tables Read",
@@ -150,6 +152,8 @@
         "tables_written": {
           "default": [],
           "items": {
+            "description": "Schema-qualified table identity: two logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+            "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
             "type": "string"
           },
           "title": "Tables Written",
@@ -250,6 +254,8 @@
         "relations": {
           "default": [],
           "items": {
+            "description": "Schema-qualified table identity: two logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+            "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
             "type": "string"
           },
           "title": "Relations",

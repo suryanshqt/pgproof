@@ -22,6 +22,9 @@ export type ArtifactType =
  * RFC 3339 timestamp in UTC, ending in 'Z'.
  */
 export type CreatedAt = string;
+/**
+ * Items: Column identity: schema, table and column logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type Columns = string[];
 export type Expression = string | null;
 export type IntroducedBy = string | null;
@@ -32,11 +35,20 @@ export type ReferentialAction = "no_action" | "restrict" | "cascade" | "set_null
  * Where a schema fact came from.
  */
 export type SchemaProvenance = "physical_catalog" | "static_migration" | "orm_declaration" | "unresolved";
+/**
+ * Items: Column identity: schema, table and column logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type ReferencedColumns = string[];
 export type ReferencedTable = string | null;
+/**
+ * Schema-qualified table identity: two logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type Table = string;
 export type Constraints = ConstraintIR[];
 export type Extensions = string[];
+/**
+ * Items: Column identity: schema, table and column logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type IncludedColumns = string[];
 export type IntroducedBy1 = string | null;
 export type IsUnique = boolean;
@@ -47,12 +59,18 @@ export type Keys = IndexKeyIR[];
 export type IndexMethod = "btree" | "hash" | "gist" | "gin" | "spgist" | "brin";
 export type Name1 = string;
 export type Predicate = string | null;
+/**
+ * Schema-qualified table identity: two logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type Table1 = string;
 export type Indexes = IndexIR[];
 export type MigrationHead = string | null;
 export type MigrationRevisions = string[];
 export type DataType = string;
 export type DefaultExpression = string | null;
+/**
+ * Column identity: schema, table and column logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type Id = string;
 export type IsGenerated = boolean;
 export type IsIdentity = boolean;
@@ -68,6 +86,9 @@ export type Path = string;
 export type Symbol = string | null;
 export type Columns1 = ColumnIR[];
 export type Comment = string | null;
+/**
+ * Schema-qualified table identity: two logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type Id1 = string;
 export type Name3 = string;
 export type SchemaName = string;

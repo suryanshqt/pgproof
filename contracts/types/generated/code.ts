@@ -23,6 +23,9 @@ export type ArtifactType =
  */
 export type CreatedAt = string;
 export type ClassName = string;
+/**
+ * Items: Column identity: schema, table and column logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type MappedColumns = string[];
 export type ModulePath = string;
 export type ContentHash = string;
@@ -33,6 +36,9 @@ export type Line = number | null;
  */
 export type Path = string;
 export type Symbol = string | null;
+/**
+ * Schema-qualified table identity: two logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type Table = string;
 export type Models = ModelIR[];
 export type Name = string;
@@ -48,7 +54,13 @@ export type Name1 = string;
 export type PassiveDeletes = boolean;
 export type PhysicalConstraint = string | null;
 export type SecondaryTable = string | null;
+/**
+ * Schema-qualified table identity: two logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type SourceTable = string;
+/**
+ * Schema-qualified table identity: two logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type TargetTable = string;
 export type Relationships = RelationshipIR[];
 export type Kind = string;

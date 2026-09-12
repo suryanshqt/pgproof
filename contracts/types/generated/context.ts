@@ -39,6 +39,9 @@ export type Rpo = string | null;
 export type Rto = string | null;
 export type CurrentRows = string | null;
 export type RowsInTwelveMonths = string | null;
+/**
+ * Schema-qualified table identity: two logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type Table = string;
 export type TableScales = TableScale[];
 export type TenantModel =

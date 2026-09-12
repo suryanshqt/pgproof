@@ -38,6 +38,8 @@
           "title": "Default Expression"
         },
         "id": {
+          "description": "Column identity: schema, table and column logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+          "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
           "title": "Id",
           "type": "string"
         },
@@ -90,6 +92,8 @@
         "columns": {
           "default": [],
           "items": {
+            "description": "Column identity: schema, table and column logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+            "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
             "type": "string"
           },
           "title": "Columns",
@@ -157,6 +161,8 @@
         "referenced_columns": {
           "default": [],
           "items": {
+            "description": "Column identity: schema, table and column logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+            "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
             "type": "string"
           },
           "title": "Referenced Columns",
@@ -165,6 +171,8 @@
         "referenced_table": {
           "anyOf": [
             {
+              "description": "Schema-qualified table identity: two logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+              "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
               "type": "string"
             },
             {
@@ -175,6 +183,8 @@
           "title": "Referenced Table"
         },
         "table": {
+          "description": "Schema-qualified table identity: two logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+          "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
           "title": "Table",
           "type": "string"
         }
@@ -205,6 +215,8 @@
         "included_columns": {
           "default": [],
           "items": {
+            "description": "Column identity: schema, table and column logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+            "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
             "type": "string"
           },
           "title": "Included Columns",
@@ -261,6 +273,8 @@
           "$ref": "#/$defs/SchemaProvenance"
         },
         "table": {
+          "description": "Schema-qualified table identity: two logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+          "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
           "title": "Table",
           "type": "string"
         }
@@ -279,6 +293,8 @@
         "column": {
           "anyOf": [
             {
+              "description": "Column identity: schema, table and column logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+              "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
               "type": "string"
             },
             {
@@ -512,6 +528,8 @@
           "title": "Comment"
         },
         "id": {
+          "description": "Schema-qualified table identity: two logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+          "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
           "title": "Id",
           "type": "string"
         },

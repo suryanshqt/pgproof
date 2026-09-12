@@ -239,6 +239,8 @@
           "title": "Rows In Twelve Months"
         },
         "table": {
+          "description": "Schema-qualified table identity: two logical names joined by '.', with '.' and '\\' escaped by '\\'.",
+          "pattern": "^(?:[^.\\\\\\x00]|\\\\[.\\\\])+\\.(?:[^.\\\\\\x00]|\\\\[.\\\\])+$",
           "title": "Table",
           "type": "string"
         }

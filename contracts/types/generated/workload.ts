@@ -50,7 +50,13 @@ export type Id = string;
 export type ObservedDurationUs = number | null;
 export type ObservedExecutions = number;
 export type OperationPhase = "setup" | "call" | "teardown";
+/**
+ * Items: Schema-qualified table identity: two logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type TablesRead = string[];
+/**
+ * Items: Schema-qualified table identity: two logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type TablesWritten = string[];
 export type Committed = boolean;
 export type CorrelationId = string;
@@ -66,6 +72,9 @@ export type IsRedacted = boolean;
 export type Position = number;
 export type ValueHash = string | null;
 export type Parameters = ParameterDescriptor[];
+/**
+ * Items: Schema-qualified table identity: two logical names joined by '.', with '.' and '\' escaped by '\'.
+ */
 export type Relations = string[];
 export type StatementClass = "read" | "write" | "schema" | "transaction" | "control" | "unsupported";
 export type Queries1 = QueryIR[];

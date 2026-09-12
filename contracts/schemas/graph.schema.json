@@ -58,7 +58,7 @@
           "title": "Label"
         },
         "source": {
-          "pattern": "^[a-z][a-z0-9_]*:[^\\s\\x00]{1,300}$",
+          "pattern": "^[a-z][a-z0-9_]*:[^\\x00]{1,512}$",
           "title": "Source",
           "type": "string"
         },
@@ -67,7 +67,7 @@
           "default": "current"
         },
         "target": {
-          "pattern": "^[a-z][a-z0-9_]*:[^\\s\\x00]{1,300}$",
+          "pattern": "^[a-z][a-z0-9_]*:[^\\x00]{1,512}$",
           "title": "Target",
           "type": "string"
         }
@@ -123,7 +123,7 @@
           "type": "object"
         },
         "id": {
-          "pattern": "^[a-z][a-z0-9_]*:[^\\s\\x00]{1,300}$",
+          "pattern": "^[a-z][a-z0-9_]*:[^\\x00]{1,512}$",
           "title": "Id",
           "type": "string"
         },

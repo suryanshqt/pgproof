@@ -125,9 +125,33 @@ def run_npm(script: str) -> subprocess.CompletedProcess[str]:
 def test_typescript_toolchain_pins_exact_versions() -> None:
     manifest = json.loads((TYPES / "package.json").read_text(encoding="utf-8"))
     pinned = manifest["devDependencies"]
-    assert set(pinned) == {"typescript", "json-schema-to-typescript"}
+    assert set(pinned) == {"ajv", "ajv-formats", "json-schema-to-typescript", "typescript"}
     for name, version in pinned.items():
         assert version[0].isdigit(), f"{name} is not pinned exactly: {version}"
+
+
+def test_typescript_toolchain_is_contract_only() -> None:
+    """No React, no bundler, no framework: this package emits types and validates."""
+    manifest = json.loads((TYPES / "package.json").read_text(encoding="utf-8"))
+    forbidden = {"react", "react-dom", "vite", "next", "@vitejs/plugin-react", "vitest"}
+    declared = set(manifest.get("devDependencies", {})) | set(manifest.get("dependencies", {}))
+    assert declared & forbidden == set()
+    assert not list(TYPES.glob("*.tsx"))
+    assert not list((TYPES / "generated").glob("*.tsx"))
+
+
+def test_the_fixture_validation_command_is_declared() -> None:
+    manifest = json.loads((TYPES / "package.json").read_text(encoding="utf-8"))
+    scripts = manifest["scripts"]
+    assert scripts["validate:fixtures"] == "node validate-fixtures.mjs"
+    assert "validate:fixtures" in scripts["test"]
+    assert (TYPES / "validate-fixtures.mjs").is_file()
+
+
+def test_the_typescript_validator_uses_the_2020_dialect_implementation() -> None:
+    script = (TYPES / "validate-fixtures.mjs").read_text(encoding="utf-8")
+    assert 'from "ajv/dist/2020.js"' in script, "must use Ajv's 2020-12 implementation"
+    assert "readdirSync" in script, "fixtures must be discovered, not hard-coded"
 
 
 def test_typescript_lockfile_is_committed() -> None:
@@ -163,3 +187,32 @@ def test_generated_typescript_has_not_drifted() -> None:
 def test_generated_typescript_compiles() -> None:
     result = run_npm("compile")
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@npm_required
+def test_typescript_validates_every_frozen_fixture() -> None:
+    """The TypeScript half of the both-languages requirement in ARCHITECTURE section 7."""
+    result = run_npm("validate:fixtures")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "valid fixtures validated" in result.stdout
+    assert "invalid fixtures rejected" in result.stdout
+
+
+@npm_required
+def test_typescript_validator_detects_a_corrupted_fixture(tmp_path: Path) -> None:
+    """Proof the validator is not vacuous: corrupt a fixture and expect failure."""
+    target = REPO / "contracts" / "fixtures" / "valid" / "graph.json"
+    backup = tmp_path / "graph.json"
+    backup.write_bytes(target.read_bytes())
+    document = json.loads(target.read_text(encoding="utf-8"))
+    document["data"]["nodes"][0]["kind"] = "not_a_node_kind"
+    try:
+        target.write_text(
+            json.dumps(document, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        result = run_npm("validate:fixtures")
+        assert result.returncode != 0
+        assert "should validate but did not" in result.stderr
+    finally:
+        target.write_bytes(backup.read_bytes())

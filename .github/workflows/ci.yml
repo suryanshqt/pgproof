@@ -85,6 +85,10 @@ jobs:
         run: npm run compile
         working-directory: contracts/types
 
+      - name: Validate the frozen fixtures with Ajv
+        run: npm run validate:fixtures
+        working-directory: contracts/types
+
   fixtures:
     name: Fixture integration (PostgreSQL 17)
     runs-on: ubuntu-latest

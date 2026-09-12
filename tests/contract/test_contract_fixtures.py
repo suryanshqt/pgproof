@@ -20,6 +20,7 @@ from pgproof.domain import (
     EvidenceGraph,
     IncompatibleSchemaVersionError,
     envelope_model_for,
+    is_compatible,
     parse_artifact,
 )
 from pgproof.domain.integrity import dangling_evidence_refs
@@ -44,16 +45,19 @@ INVALID_CASES: dict[str, tuple[str, str]] = {
     "dangling-graph-edge": ("model", "unknown nodes"),
     "recommendation-missing-evidence": ("integrity", "ev-does-not-exist"),
     "measurement-without-verified-state": ("model", "only accompany verified_in_fixture"),
+    "unqualified-table-id": ("model", "must decode to 2 logical names"),
+    "overqualified-column-id": ("model", "must decode to 3 logical names"),
+    "dangling-identity-escape": ("model", "dangling escape"),
+    "unknown-enum-on-higher-minor": ("model", "presumed"),
 }
-SCHEMA_ENFORCED = {
-    "unsupported-major-version",
-    "malformed-digest",
-    "non-utc-timestamp",
-    "invalid-enum",
-    "missing-required-field",
-    "absolute-path",
-    "non-posix-path",
+# Everything except the three joins JSON Schema cannot express. Kept in step with
+# NOT_SCHEMA_ENFORCEABLE in contracts/types/validate-fixtures.mjs, asserted below.
+NOT_SCHEMA_ENFORCEABLE = {
+    "dangling-graph-edge",
+    "recommendation-missing-evidence",
+    "measurement-without-verified-state",
 }
+SCHEMA_ENFORCED = set(INVALID_CASES) - NOT_SCHEMA_ENFORCEABLE
 
 
 def read(path: Path) -> dict[str, Any]:
@@ -189,13 +193,46 @@ def test_schema_enforced_invalid_fixtures_also_fail_independent_validation(name:
 
 
 def test_reference_integrity_is_not_claimed_to_be_schema_enforced() -> None:
-    """Recorded deliberately: JSON Schema cannot express these two joins."""
-    not_schema_enforced = set(INVALID_CASES) - SCHEMA_ENFORCED
-    assert not_schema_enforced == {
-        "dangling-graph-edge",
-        "recommendation-missing-evidence",
-        "measurement-without-verified-state",
-    }
+    """Recorded deliberately: JSON Schema cannot express these three joins."""
+    assert set(INVALID_CASES) - SCHEMA_ENFORCED == NOT_SCHEMA_ENFORCEABLE
+
+
+def test_python_and_typescript_agree_on_what_json_schema_enforces() -> None:
+    """Both validators must carry the same not-enforceable list."""
+    script = (REPO / "contracts" / "types" / "validate-fixtures.mjs").read_text(encoding="utf-8")
+    block = script.split("NOT_SCHEMA_ENFORCEABLE = new Set([")[1].split("]);")[0]
+    declared = {line.strip().strip('",') for line in block.splitlines() if '"' in line}
+    assert declared == NOT_SCHEMA_ENFORCEABLE
+
+
+@pytest.mark.parametrize("name", sorted(SCHEMA_ENFORCED), ids=lambda n: n)
+def test_schema_enforced_cases_are_rejected_by_python_too(name: str) -> None:
+    """A rule the schema enforces must also be enforced by the model."""
+    document = read(INVALID / f"{name}.json")
+    with pytest.raises((ValidationError, ValueError)):
+        parse_artifact(document)
+
+
+def test_unknown_enum_value_is_rejected_even_on_a_higher_minor() -> None:
+    """ADR 0001 rule 5: an enum change is major, so an unknown value never passes."""
+    document = read(INVALID / "unknown-enum-on-higher-minor.json")
+    assert document["schema_version"] == "1.7"
+    assert is_compatible(document["schema_version"]), "the minor must be compatible"
+    with pytest.raises(ValidationError, match="presumed"):
+        parse_artifact(document)
+    validator = Draft202012Validator(load_schema(ArtifactType.EVIDENCE))
+    assert list(validator.iter_errors(document)), "independent validation must reject it"
+
+
+def test_a_fixture_with_an_identifier_rule_fails_in_both_layers() -> None:
+    """The reported defect: Pydantic rejected an unqualified table id, the schema did not."""
+    document = read(INVALID / "unqualified-table-id.json")
+    assert document["data"]["tables"][1]["id"] == "not-qualified"
+    with pytest.raises(ValidationError, match="must decode to 2 logical names"):
+        parse_artifact(document)
+    validator = Draft202012Validator(load_schema(ArtifactType.SCHEMA))
+    errors = list(validator.iter_errors(document))
+    assert errors, "the generated schema must reject it too"
 
 
 def test_valid_fixtures_trace_every_recommendation_to_real_evidence() -> None:

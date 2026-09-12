@@ -486,3 +486,17 @@ def test_no_proof_field_reports_a_percentile() -> None:
         for name in model.model_fields:
             assert "p95" not in name
             assert "percentile" not in name
+
+
+def test_pydantic_is_bounded_below_version_three() -> None:
+    """The models target the Pydantic v2 API and its schema generator."""
+    import importlib.metadata as metadata
+    import re
+
+    requirements = metadata.requires("pgproof") or []
+    pydantic = [item for item in requirements if item.startswith("pydantic")]
+    assert len(pydantic) == 1, requirements
+    assert ">=2.9" in pydantic[0]
+    assert "<3" in pydantic[0]
+    installed = metadata.version("pydantic")
+    assert re.match(r"^2\.", installed), f"expected Pydantic 2.x, got {installed}"

@@ -23,7 +23,9 @@ classifiers = [
   "Topic :: Software Development :: Quality Assurance",
   "Typing :: Typed",
 ]
-dependencies = ["click>=8.1.7", "pydantic>=2.9"]
+# Bounded below v3: the domain models target the Pydantic v2 API, and the
+# generated JSON Schemas are produced by its schema generator.
+dependencies = ["click>=8.1.7", "pydantic>=2.9,<3"]
 
 [project.urls]
 Homepage = "https://github.com/suryanshqt/pgproof"

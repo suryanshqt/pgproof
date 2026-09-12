@@ -7,9 +7,13 @@
   "scripts": {
     "generate": "node generate.mjs --write",
     "check": "node generate.mjs --check",
-    "compile": "tsc --noEmit"
+    "compile": "tsc --noEmit",
+    "validate:fixtures": "node validate-fixtures.mjs",
+    "test": "npm run check && npm run compile && npm run validate:fixtures"
   },
   "devDependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "json-schema-to-typescript": "16.0.0",
     "typescript": "5.9.3"
   },

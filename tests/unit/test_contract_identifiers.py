@@ -5,16 +5,24 @@ NOT define a stable identity. Each test below is one of those prohibitions.
 """
 
 import datetime as dt
+import re
 
 import pytest
 from pydantic import ValidationError
 
 from pgproof.domain.identifiers import (
+    COLUMN_ID_PATTERN,
+    TABLE_ID_PATTERN,
     canonical_recommendation_identity,
     column_id,
+    column_names,
+    decode_identity,
+    encode_identity,
     node_id,
+    node_parts,
     proof_id,
     table_id,
+    table_names,
 )
 from pgproof.domain.primitives import Contract
 from pgproof.domain.recommendations import (
@@ -35,40 +43,160 @@ class IdProbe(Contract):
     column: str | None = None
 
 
+LEGAL_NAMES = [
+    ("public", "orders"),
+    ("public", "2024"),
+    ("public", "My Table"),
+    ("public", "a.b"),
+    ("public", "\u00f6rd\u00e9r"),
+    ("Public", "Orders"),
+    ("public", 'say"hi'),
+    ("weird.schema", "weird.table"),
+    ("back\\slash", "trailing "),
+    ("\u4e2d\u6587", "\u8868"),
+]
+
+
 def test_table_identity_is_schema_qualified() -> None:
     assert table_id("public", "orders") == "public.orders"
     assert column_id("public.orders", "tenant_id") == "public.orders.tenant_id"
 
 
-@pytest.mark.parametrize("value", ["orders", "a.b.c", "", ".orders", "public."])
-def test_unqualified_or_overqualified_table_ids_are_rejected(value: str) -> None:
+@pytest.mark.parametrize(("schema", "table"), LEGAL_NAMES)
+def test_every_legal_postgresql_name_round_trips(schema: str, table: str) -> None:
+    """Quoted numeric, mixed case, spaces, Unicode, quotes and dots are all legal."""
+    identity = table_id(schema, table)
+    assert table_names(identity) == (schema, table)
+    assert re.match(TABLE_ID_PATTERN, identity), f"pattern rejects {identity!r}"
+
+
+@pytest.mark.parametrize(("schema", "table"), LEGAL_NAMES)
+def test_column_identity_round_trips_over_legal_names(schema: str, table: str) -> None:
+    identity = column_id(table_id(schema, table), "a.weird.column")
+    assert column_names(identity) == (schema, table, "a.weird.column")
+    assert re.match(COLUMN_ID_PATTERN, identity)
+
+
+def test_a_numeric_logical_name_is_not_treated_as_an_oid() -> None:
+    """`"2024"` is a legal table name. Rejecting it confused numeric with OID-derived."""
+    assert table_id("public", "2024") == "public.2024"
+    assert table_names("public.2024") == ("public", "2024")
+    assert table_id("16384", "16385") == "16384.16385"
+
+
+def test_no_contract_model_carries_an_oid_field() -> None:
+    """How OIDs are actually excluded: identity is built from logical names, and
+    no model has anywhere to put a catalog number."""
+    import importlib
+    import pkgutil
+
+    import pgproof.domain as package
+    from pgproof.domain.primitives import Contract
+
+    checked = 0
+    for info in pkgutil.walk_packages(package.__path__, f"{package.__name__}."):
+        module = importlib.import_module(info.name)
+        for name in dir(module):
+            value = getattr(module, name)
+            if isinstance(value, type) and issubclass(value, Contract) and value is not Contract:
+                checked += 1
+                for field in value.model_fields:
+                    assert "oid" not in field.lower().split("_"), f"{name}.{field}"
+    assert checked > 20, "model discovery found suspiciously few models"
+
+
+def test_the_codec_is_collision_free() -> None:
+    """Two different part tuples can never encode to the same identity."""
+    assert encode_identity("public", "a.b") != encode_identity("public.a", "b")
+    seen: dict[str, tuple[str, ...]] = {}
+    parts_sets = [
+        ("public", "a.b"),
+        ("public.a", "b"),
+        ("public", "a\\b"),
+        ("public\\a", "b"),
+        ("a", "b", "c"),
+        ("a.b", "c"),
+        ("a", "b.c"),
+        ("a.b.c",),
+    ]
+    for parts in parts_sets:
+        encoded = encode_identity(*parts)
+        assert encoded not in seen, f"{parts} collides with {seen.get(encoded)}"
+        seen[encoded] = parts
+        assert decode_identity(encoded) == parts
+
+
+@pytest.mark.parametrize(
+    ("value", "reason"),
+    [
+        ("not-qualified", "must decode to 2 logical names"),
+        ("public", "must decode to 2 logical names"),
+        ("public.orders.extra", "must decode to 2 logical names"),
+        ("public.", "empty logical name"),
+        (".orders", "empty logical name"),
+        ("public..orders", "empty logical name"),
+        ("public.orders\\", "dangling escape"),
+        ("public.ord\\xers", "invalid escape"),
+        ("public.orders\x00", "NUL"),
+    ],
+)
+def test_malformed_table_identities_are_rejected(value: str, reason: str) -> None:
     from pgproof.domain.identifiers import _validate_table_id
 
-    with pytest.raises(ValueError, match="table id"):
-        _validate_table_id(value)
-
-
-@pytest.mark.parametrize("value", ["16384.16385", "public.16384", "16384.orders"])
-def test_database_oids_cannot_be_a_table_identity(value: str) -> None:
-    """A bare OID must not be parseable as a logical name."""
-    from pgproof.domain.identifiers import _validate_table_id
-
-    with pytest.raises(ValueError, match=r"numeric|identifier"):
+    with pytest.raises(ValueError, match=re.escape(reason)):
         _validate_table_id(value)
 
 
 @pytest.mark.parametrize(
     "value",
     [
-        "d9f1c2b3a4e5",
-        "d9f1c2b3a4e5f6071829304152637485960718293041526374859607182930415",
+        "not-qualified",
+        "public",
+        "public.orders.extra",
+        "public.",
+        ".orders",
+        "public..orders",
+        "public.orders\\",
+        "public.ord\\xers",
     ],
 )
-def test_container_ids_cannot_be_a_table_identity(value: str) -> None:
+def test_the_json_schema_pattern_rejects_what_python_rejects(value: str) -> None:
+    """The reported defect was exactly this disagreement."""
     from pgproof.domain.identifiers import _validate_table_id
 
-    with pytest.raises(ValueError, match="table id"):
+    with pytest.raises(ValueError, match=r"logical name|escape|NUL"):
         _validate_table_id(value)
+    assert not re.match(TABLE_ID_PATTERN, value), f"pattern accepts {value!r}"
+
+
+@pytest.mark.parametrize("name", ["", "\x00", "a\x00b"])
+def test_empty_and_nul_logical_names_are_rejected(name: str) -> None:
+    with pytest.raises(ValueError, match=r"empty|NUL"):
+        encode_identity("public", name)
+
+
+def test_node_identity_keeps_quoted_names_representable() -> None:
+    identity = table_id("public", "My Table")
+    node = node_id("table", identity)
+    assert node == "table:public.My Table"
+    assert node_parts(node) == ("table", identity)
+    assert table_names(node_parts(node)[1]) == ("public", "My Table")
+
+
+def test_node_identity_splits_on_the_first_colon_only() -> None:
+    node = node_id("query", "sha256:" + "a" * 64)
+    assert node_parts(node) == ("query", "sha256:" + "a" * 64)
+
+
+@pytest.mark.parametrize("kind", ["Table", "1table", "", "table kind"])
+def test_malformed_node_kinds_are_rejected(kind: str) -> None:
+    with pytest.raises(ValueError, match="not a node id"):
+        node_id(kind, "public.orders")
+
+
+def test_node_identity_needs_a_key() -> None:
+    with pytest.raises(ValueError, match="non-empty key"):
+        node_id("table", "")
 
 
 def test_source_identity_is_content_hash_backed_and_relative() -> None:

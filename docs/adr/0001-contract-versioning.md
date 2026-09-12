@@ -30,11 +30,10 @@ independent of `tool_version`.
 3. Unknown fields are **ignored**, not rejected. Contract models are configured
    `extra="ignore"`.
 4. A minor increment may only **add optional fields**. Adding a required field,
-   removing a field, narrowing a type, changing a field's meaning, or removing or
-   renaming an enum member is a **major** change.
-5. Adding an enum member is a minor change. Consumers must therefore treat an
-   unrecognised enum value as unknown rather than as an error, which is why
-   several enums already carry an explicit `unknown` or `unresolved` member.
+   removing a field, narrowing a type, or changing a field's meaning is a
+   **major** change.
+5. **Any change to a stable enum is a major change**, including adding a member.
+   An unknown enum value is rejected, not tolerated, at every layer.
 6. `tool_version` and `schema_version` move independently. The tool may release
    without moving the contract, and the contract may move without a tool release.
 7. A malformed or incomplete document produces a field-level validation error
@@ -51,6 +50,8 @@ independent of `tool_version`.
 | Reject minors above the reader's own | Makes a writer upgrade a breaking change for every reader, defeating the purpose of minors. |
 | Tie `schema_version` to `tool_version` | Couples a contract promise to a release cadence, and would force a contract bump for an unrelated bug fix. |
 | Semantic version with a patch component | No behavioural difference from a minor for a data contract; a third component would be decorative. |
+| Adding an enum member as a minor change | Tried first and withdrawn. It requires every consumer to tolerate an unknown value, but the Pydantic models, the generated JSON Schemas and the generated TypeScript unions all reject one, and none of the three can be made permissive without losing the exhaustiveness that makes a closed enum useful. Documenting a tolerance that no implementation provides would have been a false claim, so the policy was changed to match the implementations rather than the reverse. |
+| Open enums with a catch-all member | Would let an unknown value through as a silent `other`, which is worse than a rejection: a consumer would render an unrecognised evidence label as if it were understood. `EvidenceKind` in particular must stay closed, because the four labels are the product's trust boundary. |
 
 ## Consequences
 
@@ -61,8 +62,14 @@ independent of `tool_version`.
   and the frozen fixtures catch the rest.
 - A major bump is deliberately expensive: it requires a new ADR, a migration
   note, and regenerated schemas, fixtures and TypeScript types.
-- Consumers must tolerate unrecognised enum members. This is stated here because
-  it is not enforceable by the schema alone.
+- Harder: adding one enum member now costs a major version. That is a real price,
+  accepted for v1 because the alternative is a tolerance no layer implements. The
+  enums most likely to grow already carry an explicit `unknown` or `unresolved`
+  member, so a producer that cannot classify a value has somewhere to put it
+  without inventing a new one.
+- Consumers do **not** need unknown-value handling. All three layers reject an
+  unknown member identically, which is what makes exhaustive matching safe in
+  TypeScript.
 
 ## Product boundary impact
 
@@ -70,8 +77,10 @@ independent of `tool_version`.
 - absence of telemetry: unaffected
 - absence of a production database connection: unaffected
 - execution of project code outside the isolated runner: unaffected
-- the four evidence labels: unaffected. `EvidenceKind` is a closed enum, and
-  changing it remains an ADR-gated decision per ARCHITECTURE section 16.
+- the four evidence labels: unaffected, and now doubly protected. `EvidenceKind`
+  is a closed enum whose members are rejected if unrecognised, and changing it
+  remains both an ADR-gated decision per ARCHITECTURE section 16 and, under rule
+  5, a major contract change.
 - artifact compatibility rules: **this ADR is the statement of them**
 - repository mutation: unaffected
 
@@ -86,3 +95,8 @@ independent of `tool_version`.
   `tests/contract/test_contract_fixtures.py`.
 - The generated JSON Schema pins `schema_version` to `^1\.(0|[1-9][0-9]*)$`, so
   an independent validator enforces the same major rule.
+- An unknown enum value is rejected by the Pydantic model, by independent JSON
+  Schema validation in Python, and by Ajv in TypeScript, **including when the
+  document declares a higher compatible minor**. The frozen fixture
+  `unknown-enum-on-higher-minor` exists for exactly that case, so the policy
+  cannot drift back to a documented-but-unimplemented tolerance.
