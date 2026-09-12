@@ -1,0 +1,19 @@
+[project]
+name = "storefront"
+version = "0.1.0"
+description = "Deliberately defective multi-tenant storefront used as pgproof ground truth"
+requires-python = ">=3.11"
+dependencies = [
+  "alembic>=1.13",
+  "psycopg[binary]>=3.1",
+  "sqlalchemy>=2.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = ["-ra"]

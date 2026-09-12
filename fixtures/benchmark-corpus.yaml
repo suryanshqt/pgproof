@@ -1,0 +1,54 @@
+# External repositories pinned as pgproof compatibility and stress corpora.
+#
+# Pinned by commit so a later upstream change cannot silently alter a result
+# attributed to these repositories. Nothing here is vendored; each entry is
+# fetched by the human or CI job that needs it.
+corpus_version: 1
+
+runtime:
+  # The PostgreSQL identity every fixture measurement is taken against.
+  postgres_image: postgres:17
+  postgres_digest: sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675
+  postgres_server_version: 17.11 (Debian 17.11-1.pgdg13+2)
+
+repositories:
+  - id: full-stack-fastapi-template
+    role: first_living_integration_target
+    url: https://github.com/fastapi/full-stack-fastapi-template
+    ref: master
+    commit: cb740b656d7a0a6c5e12c7bf8e50343ec94ee9c7
+    committed_at: 2026-09-01T18:42:01Z
+    pinned_at: 2026-09-12
+    stack:
+      orm: sqlmodel
+      migrations: alembic
+      alembic_config: backend/alembic.ini
+      application_root: backend/app
+    expectations: >-
+      pgproof must complete parse-only inspection of backend/ and report its
+      unresolved constructs. No finding oracle is declared for this repository;
+      it measures compatibility and the performance budgets in
+      docs/PRODUCT_SPEC.md section 18, not correctness of individual rules.
+
+  - id: netflix-dispatch
+    role: later_stress_corpus
+    url: https://github.com/Netflix/dispatch
+    ref: main
+    commit: dd2837e82a0bf5565b1b4b4b91ea30b7262d4061
+    committed_at: 2025-09-03T04:02:48Z
+    pinned_at: 2026-09-12
+    stack:
+      orm: sqlalchemy
+      migrations: alembic
+      application_root: src/dispatch
+    expectations: >-
+      Scale and dynamic-construct stress only. Per docs/PRODUCT_SPEC.md section
+      20 this is explicitly not the primary compatibility target, so a parse
+      failure here does not block a release on its own.
+
+not_pinned:
+  - reason: >-
+      The demo fixtures in this directory are the finding oracle. External
+      repositories are never given an EXPECTED.yaml, because their upstream
+      design is not ours to declare correct or defective.
+    subject: finding oracles for external repositories

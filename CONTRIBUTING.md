@@ -83,6 +83,27 @@ roadmap item that owns them lands; this repository does not pre-create empty lay
 The check fails closed: a new top-level package under `src/pgproof/` must be given an
 explicit rule in `ALLOWED_INTERNAL` and `BANNED_EXTERNAL` before its tests pass.
 
+## Ground-truth fixtures
+
+`fixtures/` holds the broken and clean demo repositories that the rule engine is
+judged against, plus their `EXPECTED.yaml` oracles. See
+[`fixtures/README.md`](fixtures/README.md).
+
+They are analysed as data. They are never imported or installed by this
+repository's test suite, and they are excluded from Ruff; mypy and pytest do not
+reach them because both are scoped to `src` and `tests`. Do not lint or reformat
+them, because that would erase the defects they exist to carry.
+
+`tests/unit/test_fixture_oracle.py` enforces the fixture contract without
+executing fixture code: every oracle source reference must resolve to real text,
+`demo-clean` must report no headline finding, the two fixtures must differ only in
+the planted cases, and no `EXPECTED.yaml` may state a measured quantity.
+
+To work on the fixtures by hand you need Docker and a throwaway virtual
+environment holding SQLAlchemy, Alembic, and psycopg; neither is a dependency of
+pgproof itself. The exact procedure is in
+[`fixtures/demo-broken/MEASUREMENT.md`](fixtures/demo-broken/MEASUREMENT.md).
+
 ## Branches and pull requests
 
 Branch and title conventions come from

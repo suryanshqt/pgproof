@@ -1,0 +1,58 @@
+# Ground-truth oracle for the demo-clean fixture: the clean control.
+#
+# This fixture is the falsification test for the rule engine. If pgproof reports
+# any headline finding here, the rule that fired is wrong, not the fixture.
+oracle_version: 1
+fixture: demo-clean
+role: control
+description: >-
+  The demo-broken storefront with all four planted defects corrected and nothing
+  else changed.
+
+schema:
+  tables: [order_items, orders, products, tenants, users]
+  alembic_head: 6a912ef4c1b8
+  alembic_revisions: [b7c41d92a8f3, 6a912ef4c1b8]
+
+headline_findings: []
+
+clean_control_assertions:
+  - id: TENANT-001
+    corrected_by: >-
+      migration 6a912ef4c1b8 creates fk_orders_tenant_id, so the ORM relationship
+      and the physical constraint agree.
+    present_in_catalog:
+      - constraint: fk_orders_tenant_id
+        table: orders
+  - id: IDX-001
+    corrected_by: migration 6a912ef4c1b8 creates ix_orders_user_id.
+    present_in_catalog:
+      - index: ix_orders_user_id
+        table: orders
+  - id: IDX-002
+    corrected_by: >-
+      migration 6a912ef4c1b8 creates ix_orders_tenant_status_created on
+      (tenant_id, status, created_at DESC).
+    present_in_catalog:
+      - index: ix_orders_tenant_status_created
+        table: orders
+  - id: NPLUS1-001
+    corrected_by: >-
+      order_totals_by_item eager-loads Order.items with selectinload, so the
+      operation issues a fixed number of queries.
+    sources:
+      - path: app/repositories.py
+        anchor: selectinload(Order.items)
+
+must_not_report:
+  - reason: Every planted defect is corrected, so no headline finding may appear.
+    not_finding: any headline finding
+  - reason: >-
+      A clean fixture must not attract advisory noise either. Optional hardening
+      suggestions are permitted only outside the headline set.
+    not_finding: required_for_correctness finding of any kind
+
+forbidden_claims:
+  - A replica is required.
+  - Production latency will improve by a stated amount.
+  - Test execution counts represent production request frequency.

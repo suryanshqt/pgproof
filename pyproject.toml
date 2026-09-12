@@ -41,6 +41,8 @@ dev = [
   "mypy>=1.14",
   "pytest>=8.3",
   "pytest-cov>=6.0",
+  "pyyaml>=6.0",
+  "types-PyYAML>=6.0",
   "ruff>=0.9",
 ]
 
@@ -48,7 +50,18 @@ dev = [
 packages = ["src/pgproof"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/pgproof", "tests", "docs", "CONTRIBUTING.md", "LICENSE", "README.md"]
+# Leading slashes anchor each pattern at the repository root. Unanchored "tests"
+# and "README.md" also matched fixtures/demo-*/tests and fixtures/README.md,
+# shipping a fixture with its tests but without its models, migrations, or oracle.
+include = [
+  "/src/pgproof",
+  "/tests",
+  "/docs",
+  "/fixtures",
+  "/CONTRIBUTING.md",
+  "/LICENSE",
+  "/README.md",
+]
 
 [tool.ruff]
 line-length = 100
@@ -57,6 +70,9 @@ src = ["src", "tests"]
 # Pinned so a ruff upgrade cannot start reformatting code blocks inside the
 # accepted design documents under docs/ and ideation/.
 include = ["*.py", "*.pyi", "**/pyproject.toml"]
+# fixtures/ holds deliberately defective sample repositories analysed as data.
+# Linting or reformatting them would erase the defects they exist to carry.
+extend-exclude = ["fixtures"]
 
 [tool.ruff.lint]
 select = [
