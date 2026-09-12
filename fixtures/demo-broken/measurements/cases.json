@@ -1,0 +1,16 @@
+[
+  {
+    "id": "IDX-001",
+    "sql": "SELECT id, tenant_id, user_id, status, total_cents, created_at FROM orders WHERE user_id = %s",
+    "params": [42],
+    "index_name": "ix_orders_user_id",
+    "ddl": "CREATE INDEX ix_orders_user_id ON orders (user_id)"
+  },
+  {
+    "id": "IDX-002",
+    "sql": "SELECT id, tenant_id, user_id, status, total_cents, created_at FROM orders WHERE tenant_id = %s AND status = %s ORDER BY created_at DESC LIMIT 20",
+    "params": [7, "paid"],
+    "index_name": "ix_orders_tenant_status_created",
+    "ddl": "CREATE INDEX ix_orders_tenant_status_created ON orders (tenant_id, status, created_at DESC)"
+  }
+]

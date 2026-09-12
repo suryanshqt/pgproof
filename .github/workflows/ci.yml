@@ -50,6 +50,115 @@ jobs:
       - name: Test with coverage
         run: uv run pytest
 
+  fixtures:
+    name: Fixture integration (PostgreSQL 17)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Digest-addressed, matching fixtures/benchmark-corpus.yaml. A floating
+        # tag would reattribute fixture behaviour to a different server build.
+        image: postgres@sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675
+        env:
+          POSTGRES_USER: fixture
+          POSTGRES_PASSWORD: fixture
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fixture"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: fixture
+      PGPASSWORD: fixture
+      # dataset-small.sql, not dataset.sql. The 400,000-row benchmark dataset and
+      # the timing runs stay out of ordinary CI on purpose.
+      FIXTURE_DATASET: dataset-small.sql
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Create one database per fixture
+        run: |
+          psql -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE demo_broken;'
+          psql -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE demo_clean;'
+
+      - name: Apply each Alembic history and load the dataset
+        run: |
+          set -euo pipefail
+          for name in broken clean; do
+            pushd "fixtures/demo-$name"
+            uv sync --all-groups --frozen
+            DATABASE_URL="postgresql+psycopg://fixture:fixture@127.0.0.1:5432/demo_$name" \
+              uv run --frozen alembic upgrade head
+            head=$(psql -d "demo_$name" -tAc 'SELECT version_num FROM alembic_version;')
+            test "$head" = "6a912ef4c1b8" || { echo "unexpected head: $head"; exit 1; }
+            psql -d "demo_$name" -v ON_ERROR_STOP=1 -f "$FIXTURE_DATASET"
+            popd
+          done
+
+      - name: Run both fixture test suites
+        run: |
+          set -euo pipefail
+          for name in broken clean; do
+            pushd "fixtures/demo-$name"
+            DATABASE_URL="postgresql+psycopg://fixture:fixture@127.0.0.1:5432/demo_$name" \
+              uv run --frozen pytest
+            popd
+          done
+
+      - name: Assert the expected catalog differences
+        run: |
+          set -euo pipefail
+          expect() {
+            actual=$(psql -d "$1" -tAc "$3" | tr -d '[:space:]')
+            if [ "$actual" != "$2" ]; then
+              echo "FAIL $1: expected $2, got $actual for: $3"
+              exit 1
+            fi
+            echo "ok $1 = $2 :: $3"
+          }
+          fk="SELECT count(*) FROM pg_constraint WHERE conname='fk_orders_tenant_id';"
+          ix1="SELECT count(*) FROM pg_indexes WHERE indexname='ix_orders_user_id';"
+          ix2="SELECT count(*) FROM pg_indexes WHERE indexname='ix_orders_tenant_status_created';"
+          items="SELECT count(*) FROM pg_indexes WHERE indexname='ix_order_items_order_id';"
+          expect demo_broken 0 "$fk"
+          expect demo_broken 0 "$ix1"
+          expect demo_broken 0 "$ix2"
+          expect demo_clean 1 "$fk"
+          expect demo_clean 1 "$ix1"
+          expect demo_clean 1 "$ix2"
+          expect demo_broken 1 "$items"
+          expect demo_clean 1 "$items"
+
+      - name: Assert observed N+1 in broken and a fixed count in clean
+        run: |
+          set -euo pipefail
+          for name in broken clean; do
+            pushd "fixtures/demo-$name"
+            DATABASE_URL="postgresql+psycopg://fixture:fixture@127.0.0.1:5432/demo_$name" \
+              uv run --frozen python ../../scripts/fixture_measurements.py nplus1 \
+                --fixture . --tenant-id 1 --status paid > "../../nplus1-$name.json"
+            popd
+          done
+          uv run python scripts/fixture_measurements.py compare-nplus1 \
+            --broken nplus1-broken.json --clean nplus1-clean.json --clean-expected 2
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -f nplus1-broken.json nplus1-clean.json
+          rm -rf fixtures/demo-broken/.venv fixtures/demo-clean/.venv
+          psql -d postgres -c 'DROP DATABASE IF EXISTS demo_broken;' || true
+          psql -d postgres -c 'DROP DATABASE IF EXISTS demo_clean;' || true
+
   package:
     name: Package build and wheel install
     runs-on: ubuntu-latest

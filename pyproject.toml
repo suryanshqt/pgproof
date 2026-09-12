@@ -54,6 +54,8 @@ packages = ["src/pgproof"]
 # and "README.md" also matched fixtures/demo-*/tests and fixtures/README.md,
 # shipping a fixture with its tests but without its models, migrations, or oracle.
 include = [
+  "/.github/workflows",
+  "/scripts",
   "/src/pgproof",
   "/tests",
   "/docs",
@@ -100,7 +102,7 @@ ban-relative-imports = "all"
 
 [tool.mypy]
 python_version = "3.11"
-files = ["src", "tests"]
+files = ["src", "tests", "scripts"]
 strict = true
 warn_unreachable = true
 enable_error_code = [
@@ -110,6 +112,13 @@ enable_error_code = [
   "redundant-expr",
   "truthy-bool",
 ]
+
+# scripts/fixture_measurements.py drives the fixture stack, which is deliberately
+# not a pgproof dependency. Its drivers are imported lazily and only resolve
+# inside a fixture environment.
+[[tool.mypy.overrides]]
+module = ["app.*", "psycopg", "sqlalchemy.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"

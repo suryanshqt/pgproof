@@ -43,6 +43,8 @@ MAY_DIFFER = frozenset(
     }
 )
 BROKEN_ONLY = frozenset({"MEASUREMENT.md"})
+# demo-broken owns the measured baseline; demo-clean is the control, not a subject.
+BROKEN_ONLY_TREES = ("measurements/",)
 
 # Reproducing a fixture by hand creates .venv and tool caches inside it. Walking
 # those made the divergence check fail for anyone who followed the documented
@@ -157,7 +159,12 @@ def test_oracle_forbids_the_claims_the_product_may_never_make(fixture: Path) -> 
 
 def test_clean_differs_from_broken_only_in_the_planted_cases() -> None:
     broken_files, clean_files = relative_files(BROKEN), relative_files(CLEAN)
-    assert broken_files - clean_files == BROKEN_ONLY
+    unmatched = {
+        path
+        for path in broken_files - clean_files
+        if path not in BROKEN_ONLY and not path.startswith(BROKEN_ONLY_TREES)
+    }
+    assert unmatched == set(), f"unexpected broken-only files: {sorted(unmatched)}"
     assert clean_files - broken_files == set()
 
     shared = sorted(broken_files & clean_files)
@@ -235,3 +242,10 @@ def test_measured_environment_matches_the_fixture_lockfile() -> None:
         )
     python_version = (BROKEN / ".python-version").read_text().strip()
     assert f"| Python | {python_version}" in environment
+
+
+def test_measurement_evidence_belongs_only_to_the_broken_fixture() -> None:
+    assert (BROKEN / "measurements").is_dir()
+    assert not (CLEAN / "measurements").exists()
+    assert (BROKEN / "dataset-small.sql").is_file()
+    assert (CLEAN / "dataset-small.sql").is_file()

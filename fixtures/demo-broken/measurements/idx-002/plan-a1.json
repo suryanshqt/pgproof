@@ -1,0 +1,112 @@
+{
+  "explain_options": "ANALYZE, BUFFERS, WAL, TIMING OFF, FORMAT JSON",
+  "timing_enabled": false,
+  "normalized_shape": "Limit -> Sort -> Seq Scan on orders",
+  "explain": [
+    {
+      "Plan": {
+        "Node Type": "Limit",
+        "Parallel Aware": false,
+        "Async Capable": false,
+        "Startup Cost": 9013.83,
+        "Total Cost": 9013.88,
+        "Plan Rows": 20,
+        "Plan Width": 30,
+        "Actual Rows": 20,
+        "Actual Loops": 1,
+        "Shared Hit Blocks": 2982,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "WAL Records": 0,
+        "WAL FPI": 0,
+        "WAL Bytes": 0,
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Parent Relationship": "Outer",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 9013.83,
+            "Total Cost": 9016.82,
+            "Plan Rows": 1196,
+            "Plan Width": 30,
+            "Actual Rows": 20,
+            "Actual Loops": 1,
+            "Sort Key": [
+              "created_at DESC"
+            ],
+            "Sort Method": "top-N heapsort",
+            "Sort Space Used": 27,
+            "Sort Space Type": "Memory",
+            "Shared Hit Blocks": 2982,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "WAL Records": 0,
+            "WAL FPI": 0,
+            "WAL Bytes": 0,
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Relation Name": "orders",
+                "Alias": "orders",
+                "Startup Cost": 0.0,
+                "Total Cost": 8982.0,
+                "Plan Rows": 1196,
+                "Plan Width": 30,
+                "Actual Rows": 1200,
+                "Actual Loops": 1,
+                "Filter": "((tenant_id = '7'::smallint) AND ((status)::text = 'paid'::text))",
+                "Rows Removed by Filter": 398800,
+                "Shared Hit Blocks": 2982,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "WAL Records": 0,
+                "WAL FPI": 0,
+                "WAL Bytes": 0
+              }
+            ]
+          }
+        ]
+      },
+      "Planning": {
+        "Shared Hit Blocks": 0,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning Time": 0.016,
+      "Triggers": [],
+      "Execution Time": 9.3
+    }
+  ]
+}

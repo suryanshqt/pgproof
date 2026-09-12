@@ -1,0 +1,113 @@
+{
+  "case_id": "IDX-002",
+  "run": 1,
+  "recorded_at": "2026-09-12T13:17:54Z",
+  "units": "microseconds",
+  "protocol": {
+    "warmups": 3,
+    "samples": 7,
+    "order": "control A1, physical treatment B, drift control A2",
+    "fetch_policy": "execute then fetchall, both inside the timed region"
+  },
+  "formulas": {
+    "median": "sorted(samples)[len(samples) // 2], which is index 3 of 7",
+    "iqr_fraction": "(sorted(samples)[5] - sorted(samples)[1]) / median",
+    "drift_fraction": "abs(median_a2 - median_a1) / median_a1",
+    "absolute_saving": "median_a1 - median_b",
+    "ratio": "median_a1 / median_b",
+    "units": "every raw sample is an integer count of microseconds"
+  },
+  "query": {
+    "sql": "SELECT id, tenant_id, user_id, status, total_cents, created_at FROM orders WHERE tenant_id = %s AND status = %s ORDER BY created_at DESC LIMIT 20",
+    "params": [
+      7,
+      "paid"
+    ],
+    "rows": 20
+  },
+  "arms": {
+    "control_a1": {
+      "warmups": [
+        11085,
+        10002,
+        9831
+      ],
+      "samples": [
+        9851,
+        9938,
+        10089,
+        9758,
+        9464,
+        9475,
+        9422
+      ],
+      "rows": 20
+    },
+    "treatment_b": {
+      "warmups": [
+        425,
+        252,
+        236
+      ],
+      "samples": [
+        242,
+        242,
+        230,
+        257,
+        239,
+        237,
+        228
+      ],
+      "rows": 20
+    },
+    "drift_control_a2": {
+      "warmups": [
+        10613,
+        10057,
+        9932
+      ],
+      "samples": [
+        10448,
+        10055,
+        9951,
+        9908,
+        9757,
+        9862,
+        9635
+      ],
+      "rows": 20
+    }
+  },
+  "index": {
+    "name": "ix_orders_tenant_status_created",
+    "ddl": "CREATE INDEX ix_orders_tenant_status_created ON orders (tenant_id, status, created_at DESC)",
+    "build_us": 147183,
+    "size_bytes": 16269312,
+    "size_pretty": "16 MB"
+  },
+  "dataset": {
+    "orders": 400000,
+    "order_items": 800000,
+    "total_cents_checksum": 1697400000
+  },
+  "server": {
+    "version": "17.11 (Debian 17.11-1.pgdg13+2)",
+    "image_digest": "sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675"
+  },
+  "client": {
+    "python": "3.13.5",
+    "sqlalchemy": "2.0.52",
+    "alembic": "1.20.0",
+    "psycopg": "3.3.5",
+    "pytest": "9.1.1"
+  },
+  "host": {
+    "os": "Darwin",
+    "architecture": "arm64"
+  },
+  "session_settings": [
+    "SET max_parallel_workers_per_gather = 0",
+    "SET jit = off",
+    "SET statement_timeout = '30s'"
+  ]
+}
