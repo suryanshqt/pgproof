@@ -23,7 +23,7 @@ classifiers = [
   "Topic :: Software Development :: Quality Assurance",
   "Typing :: Typed",
 ]
-dependencies = ["click>=8.1.7"]
+dependencies = ["click>=8.1.7", "pydantic>=2.9"]
 
 [project.urls]
 Homepage = "https://github.com/suryanshqt/pgproof"
@@ -41,13 +41,22 @@ dev = [
   "mypy>=1.14",
   "pytest>=8.3",
   "pytest-cov>=6.0",
+  "jsonschema>=4.23",
   "pyyaml>=6.0",
   "types-PyYAML>=6.0",
+  "types-jsonschema>=4.23",
   "ruff>=0.9",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pgproof"]
+
+# The generated schemas are canonically at contracts/schemas per ARCHITECTURE
+# section 5. Copying them under the package makes an installed pgproof able to
+# resolve its own contracts through importlib.resources, per section 15. Frozen
+# fixtures and the TypeScript toolchain are deliberately not copied.
+[tool.hatch.build.targets.wheel.force-include]
+"contracts/schemas" = "pgproof/contracts/schemas"
 
 [tool.hatch.build.targets.sdist]
 # Leading slashes anchor each pattern at the repository root. Unanchored "tests"
@@ -58,6 +67,7 @@ include = [
   "/scripts",
   "/src/pgproof",
   "/tests",
+  "/contracts",
   "/docs",
   "/fixtures",
   "/CONTRIBUTING.md",

@@ -1,0 +1,55 @@
+{
+  "artifact_type": "scenarios",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data": {
+    "diffs": [
+      {
+        "base": "launch_minimal",
+        "deltas": [
+          {
+            "caused_by": "read_after_write_invoices",
+            "explanation": "Twelve-month scale makes the composite index worth verifying.",
+            "kind": "added",
+            "recommendation": "IDX-002"
+          }
+        ],
+        "target": "growth_ready"
+      }
+    ],
+    "scenarios": [
+      {
+        "kind": "launch_minimal",
+        "operational_complexity": "unchanged",
+        "recommendations": [
+          "TENANT-001"
+        ],
+        "requirements_satisfied": [
+          "Tenant ownership enforced."
+        ],
+        "summary": "Simplest design preserving integrity at confirmed launch scale.",
+        "title": "Launch-minimal",
+        "unresolved_blockers": []
+      },
+      {
+        "kind": "growth_ready",
+        "operational_complexity": "slightly_higher",
+        "recommendations": [
+          "TENANT-001",
+          "IDX-002"
+        ],
+        "requirements_satisfied": [],
+        "summary": "Adds the verified index for the twelve-month scale.",
+        "title": "Growth-ready",
+        "unresolved_blockers": [
+          "read_after_write_invoices"
+        ]
+      }
+    ]
+  },
+  "inputs": {
+    "repository": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
+  "schema_version": "1.0",
+  "tool_version": "0.1.0"
+}

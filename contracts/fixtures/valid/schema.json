@@ -1,0 +1,137 @@
+{
+  "artifact_type": "schema",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data": {
+    "constraints": [
+      {
+        "columns": [
+          "public.orders.id"
+        ],
+        "expression": null,
+        "introduced_by": "6a912ef4c1b8",
+        "kind": "primary_key",
+        "name": "orders_pkey",
+        "on_delete": null,
+        "on_update": null,
+        "provenance": "physical_catalog",
+        "referenced_columns": [],
+        "referenced_table": null,
+        "table": "public.orders"
+      }
+    ],
+    "extensions": [
+      "plpgsql"
+    ],
+    "indexes": [
+      {
+        "included_columns": [],
+        "introduced_by": null,
+        "is_unique": true,
+        "keys": [
+          {
+            "column": "public.orders.id",
+            "direction": "asc",
+            "expression": null
+          }
+        ],
+        "method": "btree",
+        "name": "orders_pkey",
+        "predicate": null,
+        "provenance": "physical_catalog",
+        "table": "public.orders"
+      }
+    ],
+    "migration_head": "6a912ef4c1b8",
+    "migration_revisions": [
+      "b7c41d92a8f3",
+      "6a912ef4c1b8"
+    ],
+    "provenance": "physical_catalog",
+    "tables": [
+      {
+        "columns": [
+          {
+            "data_type": "integer",
+            "default_expression": null,
+            "id": "public.tenants.id",
+            "is_generated": false,
+            "is_identity": true,
+            "name": "id",
+            "nullable": false,
+            "provenance": "physical_catalog",
+            "source": null
+          }
+        ],
+        "comment": null,
+        "id": "public.tenants",
+        "name": "tenants",
+        "provenance": "physical_catalog",
+        "schema_name": "public",
+        "source": null
+      },
+      {
+        "columns": [
+          {
+            "data_type": "integer",
+            "default_expression": null,
+            "id": "public.orders.id",
+            "is_generated": false,
+            "is_identity": true,
+            "name": "id",
+            "nullable": false,
+            "provenance": "physical_catalog",
+            "source": null
+          },
+          {
+            "data_type": "integer",
+            "default_expression": null,
+            "id": "public.orders.tenant_id",
+            "is_generated": false,
+            "is_identity": false,
+            "name": "tenant_id",
+            "nullable": false,
+            "provenance": "physical_catalog",
+            "source": {
+              "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "end_line": null,
+              "line": 31,
+              "path": "app/models.py",
+              "symbol": "Order.tenant_id"
+            }
+          }
+        ],
+        "comment": null,
+        "id": "public.orders",
+        "name": "orders",
+        "provenance": "physical_catalog",
+        "schema_name": "public",
+        "source": {
+          "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "end_line": null,
+          "line": 31,
+          "path": "app/models.py",
+          "symbol": "Order.tenant_id"
+        }
+      }
+    ],
+    "unsupported": [
+      {
+        "kind": "op_execute",
+        "reason": "raw SQL payload not resolved",
+        "source": {
+          "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "end_line": null,
+          "line": 44,
+          "path": "migrations/versions/0002_orders.py",
+          "symbol": null
+        }
+      }
+    ]
+  },
+  "inputs": {
+    "repository": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
+  "schema_version": "1.0",
+  "tool_version": "0.1.0"
+}

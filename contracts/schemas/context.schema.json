@@ -1,0 +1,314 @@
+{
+  "$defs": {
+    "AnswerState": {
+      "enum": [
+        "answered",
+        "unknown",
+        "not_asked"
+      ],
+      "title": "AnswerState",
+      "type": "string"
+    },
+    "ArtifactType": {
+      "description": "Every top-level artifact this contract version defines.",
+      "enum": [
+        "schema",
+        "code",
+        "workload",
+        "context",
+        "evidence",
+        "recommendations",
+        "scenarios",
+        "graph",
+        "stages",
+        "proofs"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "ConsistencyRequirement": {
+      "description": "An operation that must read its own writes immediately.",
+      "properties": {
+        "lag_tolerance_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lag Tolerance Seconds"
+        },
+        "operation_label": {
+          "minLength": 1,
+          "title": "Operation Label",
+          "type": "string"
+        },
+        "requires_read_after_write": {
+          "title": "Requires Read After Write",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "operation_label",
+        "requires_read_after_write"
+      ],
+      "title": "ConsistencyRequirement",
+      "type": "object"
+    },
+    "ContextAnswer": {
+      "description": "One interview answer, with the state that makes 'unknown' explicit.",
+      "properties": {
+        "note": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "question": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Question",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/AnswerState"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "question",
+        "state"
+      ],
+      "title": "ContextAnswer",
+      "type": "object"
+    },
+    "ContextIR": {
+      "description": "Confirmed requirements. Anything absent stays unknown, never assumed.",
+      "properties": {
+        "answers": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ContextAnswer"
+          },
+          "title": "Answers",
+          "type": "array"
+        },
+        "consistency_requirements": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ConsistencyRequirement"
+          },
+          "title": "Consistency Requirements",
+          "type": "array"
+        },
+        "critical_operations": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Critical Operations",
+          "type": "array"
+        },
+        "peak_requests_per_second": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Peak Requests Per Second"
+        },
+        "read_write_ratio": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Read Write Ratio"
+        },
+        "retention_constraints": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Retention Constraints",
+          "type": "array"
+        },
+        "rpo": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rpo"
+        },
+        "rto": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rto"
+        },
+        "table_scales": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/TableScale"
+          },
+          "title": "Table Scales",
+          "type": "array"
+        },
+        "tenant_model": {
+          "$ref": "#/$defs/TenantModel",
+          "default": "unknown"
+        }
+      },
+      "title": "ContextIR",
+      "type": "object"
+    },
+    "TableScale": {
+      "description": "Present and expected row counts. Decimal strings keep exactness.",
+      "properties": {
+        "current_rows": {
+          "anyOf": [
+            {
+              "description": "Exact decimal carried as a string.",
+              "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Rows"
+        },
+        "rows_in_twelve_months": {
+          "anyOf": [
+            {
+              "description": "Exact decimal carried as a string.",
+              "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rows In Twelve Months"
+        },
+        "table": {
+          "title": "Table",
+          "type": "string"
+        }
+      },
+      "required": [
+        "table"
+      ],
+      "title": "TableScale",
+      "type": "object"
+    },
+    "TenantModel": {
+      "enum": [
+        "single_tenant",
+        "shared_schema_tenant_id",
+        "schema_per_tenant",
+        "database_per_tenant",
+        "unknown"
+      ],
+      "title": "TenantModel",
+      "type": "string"
+    }
+  },
+  "$id": "https://pgproof.dev/contracts/1.0/context.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Transport envelope for the pgproof context artifact, contract schema version 1.0.",
+  "properties": {
+    "artifact_type": {
+      "$ref": "#/$defs/ArtifactType"
+    },
+    "created_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$",
+      "title": "Created At",
+      "type": "string"
+    },
+    "data": {
+      "$ref": "#/$defs/ContextIR"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Inputs",
+      "type": "object"
+    },
+    "run_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "pattern": "^1\\.(0|[1-9][0-9]*)$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[.\\-+][0-9A-Za-z.\\-+]+)?$",
+      "title": "Tool Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool_version",
+    "artifact_type",
+    "created_at",
+    "run_id",
+    "data"
+  ],
+  "title": "ContextArtifact",
+  "type": "object"
+}

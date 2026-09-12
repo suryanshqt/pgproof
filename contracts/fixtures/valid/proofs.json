@@ -1,0 +1,77 @@
+{
+  "artifact_type": "proofs",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data": {
+    "proofs": [
+      {
+        "absolute_saving_us": 9520,
+        "arms": [
+          {
+            "arm": "control_a1",
+            "iqr_fraction": "0.0492",
+            "median_us": 9760,
+            "plan_shape": "Limit -> Sort -> Seq Scan",
+            "q1_us": 9600,
+            "q3_us": 10080,
+            "samples": 7,
+            "warmups_discarded": 3
+          },
+          {
+            "arm": "treatment_b",
+            "iqr_fraction": "0.0500",
+            "median_us": 240,
+            "plan_shape": "Limit -> Index Scan",
+            "q1_us": 232,
+            "q3_us": 244,
+            "samples": 7,
+            "warmups_discarded": 3
+          },
+          {
+            "arm": "drift_control_a2",
+            "iqr_fraction": "0.0212",
+            "median_us": 9910,
+            "plan_shape": null,
+            "q1_us": 9800,
+            "q3_us": 10010,
+            "samples": 7,
+            "warmups_discarded": 3
+          }
+        ],
+        "dataset_seed": "synthetic-1",
+        "drift_fraction": "0.0154",
+        "fixture_scale": "orders 400000, seed synthetic-1",
+        "id": "IDX-002@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "input_manifest_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "postgres_version": "17",
+        "query": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "recommendation": "IDX-002",
+        "rejection_reason": null,
+        "stability_note": null,
+        "treatment": "composite_btree",
+        "verdict": "verified_in_fixture"
+      },
+      {
+        "absolute_saving_us": null,
+        "arms": [],
+        "dataset_seed": "synthetic-1",
+        "drift_fraction": null,
+        "fixture_scale": "orders 400000, seed synthetic-1",
+        "id": "IDX-009@sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "input_manifest_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "postgres_version": "17",
+        "query": null,
+        "recommendation": "IDX-009",
+        "rejection_reason": "Saving fell below the configured absolute threshold.",
+        "stability_note": null,
+        "treatment": "single_column_btree",
+        "verdict": "rejected"
+      }
+    ]
+  },
+  "inputs": {
+    "repository": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
+  "schema_version": "1.0",
+  "tool_version": "0.1.0"
+}

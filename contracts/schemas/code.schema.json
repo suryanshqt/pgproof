@@ -1,0 +1,389 @@
+{
+  "$defs": {
+    "ArtifactType": {
+      "description": "Every top-level artifact this contract version defines.",
+      "enum": [
+        "schema",
+        "code",
+        "workload",
+        "context",
+        "evidence",
+        "recommendations",
+        "scenarios",
+        "graph",
+        "stages",
+        "proofs"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "Cardinality": {
+      "enum": [
+        "one_to_one",
+        "one_to_many",
+        "many_to_one",
+        "many_to_many",
+        "unresolved"
+      ],
+      "title": "Cardinality",
+      "type": "string"
+    },
+    "CodeIR": {
+      "description": "The design the application declares, independent of any catalog.",
+      "properties": {
+        "models": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ModelIR"
+          },
+          "title": "Models",
+          "type": "array"
+        },
+        "operations": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RepositoryOperation"
+          },
+          "title": "Operations",
+          "type": "array"
+        },
+        "orm": {
+          "minLength": 1,
+          "title": "Orm",
+          "type": "string"
+        },
+        "relationships": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RelationshipIR"
+          },
+          "title": "Relationships",
+          "type": "array"
+        },
+        "unsupported": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/UnsupportedConstruct"
+          },
+          "title": "Unsupported",
+          "type": "array"
+        }
+      },
+      "required": [
+        "orm"
+      ],
+      "title": "CodeIR",
+      "type": "object"
+    },
+    "LoadingStrategy": {
+      "enum": [
+        "select",
+        "joined",
+        "subquery",
+        "selectin",
+        "immediate",
+        "noload",
+        "raiseload",
+        "dynamic",
+        "unresolved"
+      ],
+      "title": "LoadingStrategy",
+      "type": "string"
+    },
+    "ModelIR": {
+      "description": "A mapped class.",
+      "properties": {
+        "class_name": {
+          "minLength": 1,
+          "title": "Class Name",
+          "type": "string"
+        },
+        "mapped_columns": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Mapped Columns",
+          "type": "array"
+        },
+        "module_path": {
+          "minLength": 1,
+          "title": "Module Path",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "table": {
+          "title": "Table",
+          "type": "string"
+        }
+      },
+      "required": [
+        "class_name",
+        "table",
+        "module_path",
+        "source"
+      ],
+      "title": "ModelIR",
+      "type": "object"
+    },
+    "RelationshipIR": {
+      "description": "A relationship declared by the ORM.",
+      "properties": {
+        "back_populates": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Back Populates"
+        },
+        "cardinality": {
+          "$ref": "#/$defs/Cardinality"
+        },
+        "cascade": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Cascade",
+          "type": "array"
+        },
+        "loading_strategy": {
+          "$ref": "#/$defs/LoadingStrategy",
+          "default": "select"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "passive_deletes": {
+          "default": false,
+          "title": "Passive Deletes",
+          "type": "boolean"
+        },
+        "physical_constraint": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Physical Constraint"
+        },
+        "secondary_table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secondary Table"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "source_table": {
+          "title": "Source Table",
+          "type": "string"
+        },
+        "target_table": {
+          "title": "Target Table",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "source_table",
+        "target_table",
+        "cardinality",
+        "source"
+      ],
+      "title": "RelationshipIR",
+      "type": "object"
+    },
+    "RepositoryOperation": {
+      "description": "A callable in the application that issues database work.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "qualified_name": {
+          "minLength": 1,
+          "title": "Qualified Name",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "name",
+        "qualified_name",
+        "source"
+      ],
+      "title": "RepositoryOperation",
+      "type": "object"
+    },
+    "SourceRef": {
+      "description": "A location in the analysed repository.",
+      "properties": {
+        "content_hash": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "end_line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Line"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "path": {
+          "description": "Repository-relative POSIX path.",
+          "pattern": "^(?!.*//)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![A-Za-z]:)[^/\\\\\\x00~][^\\\\\\x00]*(?<!/)$",
+          "title": "Path",
+          "type": "string"
+        },
+        "symbol": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Symbol"
+        }
+      },
+      "required": [
+        "path",
+        "content_hash"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "UnsupportedConstruct": {
+      "description": "A construct the parser saw but declined to interpret.\n\n`docs/PRODUCT_SPEC.md` section 7 forbids hiding unsupported inputs, so these\nare first-class contract data rather than log output.",
+      "properties": {
+        "kind": {
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "reason"
+      ],
+      "title": "UnsupportedConstruct",
+      "type": "object"
+    }
+  },
+  "$id": "https://pgproof.dev/contracts/1.0/code.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Transport envelope for the pgproof code artifact, contract schema version 1.0.",
+  "properties": {
+    "artifact_type": {
+      "$ref": "#/$defs/ArtifactType"
+    },
+    "created_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$",
+      "title": "Created At",
+      "type": "string"
+    },
+    "data": {
+      "$ref": "#/$defs/CodeIR"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Inputs",
+      "type": "object"
+    },
+    "run_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "pattern": "^1\\.(0|[1-9][0-9]*)$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[.\\-+][0-9A-Za-z.\\-+]+)?$",
+      "title": "Tool Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool_version",
+    "artifact_type",
+    "created_at",
+    "run_id",
+    "data"
+  ],
+  "title": "CodeArtifact",
+  "type": "object"
+}

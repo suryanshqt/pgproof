@@ -1,0 +1,226 @@
+{
+  "$defs": {
+    "ArtifactType": {
+      "description": "Every top-level artifact this contract version defines.",
+      "enum": [
+        "schema",
+        "code",
+        "workload",
+        "context",
+        "evidence",
+        "recommendations",
+        "scenarios",
+        "graph",
+        "stages",
+        "proofs"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "EdgeKind": {
+      "description": "A physical foreign key and an ORM-only relationship are distinct kinds.",
+      "enum": [
+        "physical_foreign_key",
+        "orm_only_relationship",
+        "contains",
+        "reads",
+        "writes",
+        "calls",
+        "routes_to",
+        "owns",
+        "proposed"
+      ],
+      "title": "EdgeKind",
+      "type": "string"
+    },
+    "GraphEdge": {
+      "description": "A directed edge whose meaning is its kind.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/EdgeKind"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "source": {
+          "pattern": "^[a-z][a-z0-9_]*:[^\\s\\x00]{1,300}$",
+          "title": "Source",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/GraphStatus",
+          "default": "current"
+        },
+        "target": {
+          "pattern": "^[a-z][a-z0-9_]*:[^\\s\\x00]{1,300}$",
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "source",
+        "target"
+      ],
+      "title": "GraphEdge",
+      "type": "object"
+    },
+    "GraphIR": {
+      "description": "A canonical graph with referential integrity enforced on construction.",
+      "properties": {
+        "edges": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/GraphEdge"
+          },
+          "title": "Edges",
+          "type": "array"
+        },
+        "nodes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/GraphNode"
+          },
+          "title": "Nodes",
+          "type": "array"
+        },
+        "view": {
+          "minLength": 1,
+          "title": "View",
+          "type": "string"
+        }
+      },
+      "required": [
+        "view"
+      ],
+      "title": "GraphIR",
+      "type": "object"
+    },
+    "GraphNode": {
+      "description": "A node. Position is presentation state and deliberately absent.",
+      "properties": {
+        "attributes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Attributes",
+          "type": "object"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]*:[^\\s\\x00]{1,300}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/NodeKind"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/GraphStatus",
+          "default": "current"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label"
+      ],
+      "title": "GraphNode",
+      "type": "object"
+    },
+    "GraphStatus": {
+      "enum": [
+        "current",
+        "proposed_addition",
+        "proposed_removal"
+      ],
+      "title": "GraphStatus",
+      "type": "string"
+    },
+    "NodeKind": {
+      "enum": [
+        "schema",
+        "table",
+        "column",
+        "index",
+        "operation",
+        "transaction",
+        "query",
+        "procedure",
+        "topology_component"
+      ],
+      "title": "NodeKind",
+      "type": "string"
+    }
+  },
+  "$id": "https://pgproof.dev/contracts/1.0/graph.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Transport envelope for the pgproof graph artifact, contract schema version 1.0.",
+  "properties": {
+    "artifact_type": {
+      "$ref": "#/$defs/ArtifactType"
+    },
+    "created_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$",
+      "title": "Created At",
+      "type": "string"
+    },
+    "data": {
+      "$ref": "#/$defs/GraphIR"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Inputs",
+      "type": "object"
+    },
+    "run_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "pattern": "^1\\.(0|[1-9][0-9]*)$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[.\\-+][0-9A-Za-z.\\-+]+)?$",
+      "title": "Tool Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool_version",
+    "artifact_type",
+    "created_at",
+    "run_id",
+    "data"
+  ],
+  "title": "GraphArtifact",
+  "type": "object"
+}

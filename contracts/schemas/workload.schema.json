@@ -1,0 +1,483 @@
+{
+  "$defs": {
+    "AmplificationClass": {
+      "description": "Classifications from `docs/TECHNICAL_DESIGN.md` section 23.",
+      "enum": [
+        "repeated_query",
+        "possible_amplification",
+        "observed_n_plus_one",
+        "verified_treatment"
+      ],
+      "title": "AmplificationClass",
+      "type": "string"
+    },
+    "AmplificationIR": {
+      "description": "Repeated child work inside one operation.",
+      "properties": {
+        "call_site": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "child_query": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Child Query",
+          "type": "string"
+        },
+        "classification": {
+          "$ref": "#/$defs/AmplificationClass"
+        },
+        "parent_query": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Parent Query",
+          "type": "string"
+        },
+        "relationship_name": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Relationship Name"
+        },
+        "repetitions": {
+          "title": "Repetitions",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "classification",
+        "parent_query",
+        "child_query",
+        "repetitions"
+      ],
+      "title": "AmplificationIR",
+      "type": "object"
+    },
+    "ArtifactType": {
+      "description": "Every top-level artifact this contract version defines.",
+      "enum": [
+        "schema",
+        "code",
+        "workload",
+        "context",
+        "evidence",
+        "recommendations",
+        "scenarios",
+        "graph",
+        "stages",
+        "proofs"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "OperationIR": {
+      "description": "An application operation, identified by adapter kind plus test identity.",
+      "properties": {
+        "amplifications": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/AmplificationIR"
+          },
+          "title": "Amplifications",
+          "type": "array"
+        },
+        "entry_point": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]*::[^\\s\\x00]{1,300}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "observed_duration_us": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed Duration Us"
+        },
+        "observed_executions": {
+          "default": 1,
+          "title": "Observed Executions",
+          "type": "integer"
+        },
+        "phase": {
+          "$ref": "#/$defs/OperationPhase"
+        },
+        "query_counts": {
+          "patternProperties": {
+            "^sha256:[0-9a-f]{64}$": {
+              "type": "integer"
+            }
+          },
+          "title": "Query Counts",
+          "type": "object"
+        },
+        "tables_read": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tables Read",
+          "type": "array"
+        },
+        "tables_written": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tables Written",
+          "type": "array"
+        },
+        "transactions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/TransactionIR"
+          },
+          "title": "Transactions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "phase"
+      ],
+      "title": "OperationIR",
+      "type": "object"
+    },
+    "OperationPhase": {
+      "enum": [
+        "setup",
+        "call",
+        "teardown"
+      ],
+      "title": "OperationPhase",
+      "type": "string"
+    },
+    "ParameterDescriptor": {
+      "description": "Parameter shape without its value.",
+      "properties": {
+        "data_type": {
+          "minLength": 1,
+          "title": "Data Type",
+          "type": "string"
+        },
+        "is_redacted": {
+          "default": true,
+          "title": "Is Redacted",
+          "type": "boolean"
+        },
+        "position": {
+          "title": "Position",
+          "type": "integer"
+        },
+        "value_hash": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Hash"
+        }
+      },
+      "required": [
+        "position",
+        "data_type"
+      ],
+      "title": "ParameterDescriptor",
+      "type": "object"
+    },
+    "QueryIR": {
+      "description": "A normalised statement, identified by its parse-tree fingerprint.",
+      "properties": {
+        "call_sites": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          },
+          "title": "Call Sites",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "normalized_sql": {
+          "minLength": 1,
+          "title": "Normalized Sql",
+          "type": "string"
+        },
+        "parameters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ParameterDescriptor"
+          },
+          "title": "Parameters",
+          "type": "array"
+        },
+        "relations": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Relations",
+          "type": "array"
+        },
+        "statement_class": {
+          "$ref": "#/$defs/StatementClass"
+        }
+      },
+      "required": [
+        "id",
+        "statement_class",
+        "normalized_sql"
+      ],
+      "title": "QueryIR",
+      "type": "object"
+    },
+    "SourceRef": {
+      "description": "A location in the analysed repository.",
+      "properties": {
+        "content_hash": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "end_line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Line"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "path": {
+          "description": "Repository-relative POSIX path.",
+          "pattern": "^(?!.*//)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![A-Za-z]:)[^/\\\\\\x00~][^\\\\\\x00]*(?<!/)$",
+          "title": "Path",
+          "type": "string"
+        },
+        "symbol": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Symbol"
+        }
+      },
+      "required": [
+        "path",
+        "content_hash"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "StatementClass": {
+      "enum": [
+        "read",
+        "write",
+        "schema",
+        "transaction",
+        "control",
+        "unsupported"
+      ],
+      "title": "StatementClass",
+      "type": "string"
+    },
+    "TransactionIR": {
+      "description": "One transaction boundary inside an operation.",
+      "properties": {
+        "committed": {
+          "title": "Committed",
+          "type": "boolean"
+        },
+        "correlation_id": {
+          "minLength": 1,
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "queries": {
+          "default": [],
+          "items": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "title": "Queries",
+          "type": "array"
+        }
+      },
+      "required": [
+        "correlation_id",
+        "committed"
+      ],
+      "title": "TransactionIR",
+      "type": "object"
+    },
+    "WorkloadCoverage": {
+      "description": "Whether the captured workload may be treated as complete.",
+      "enum": [
+        "complete_for_selection",
+        "partial",
+        "not_captured"
+      ],
+      "title": "WorkloadCoverage",
+      "type": "string"
+    },
+    "WorkloadIR": {
+      "description": "Captured database activity and its honest boundary.",
+      "properties": {
+        "boundary_note": {
+          "minLength": 1,
+          "title": "Boundary Note",
+          "type": "string"
+        },
+        "coverage": {
+          "$ref": "#/$defs/WorkloadCoverage"
+        },
+        "failed_tests": {
+          "default": 0,
+          "title": "Failed Tests",
+          "type": "integer"
+        },
+        "operations": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/OperationIR"
+          },
+          "title": "Operations",
+          "type": "array"
+        },
+        "passed_tests": {
+          "default": 0,
+          "title": "Passed Tests",
+          "type": "integer"
+        },
+        "queries": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/QueryIR"
+          },
+          "title": "Queries",
+          "type": "array"
+        },
+        "selected_tests": {
+          "default": 0,
+          "title": "Selected Tests",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "coverage",
+        "boundary_note"
+      ],
+      "title": "WorkloadIR",
+      "type": "object"
+    }
+  },
+  "$id": "https://pgproof.dev/contracts/1.0/workload.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Transport envelope for the pgproof workload artifact, contract schema version 1.0.",
+  "properties": {
+    "artifact_type": {
+      "$ref": "#/$defs/ArtifactType"
+    },
+    "created_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$",
+      "title": "Created At",
+      "type": "string"
+    },
+    "data": {
+      "$ref": "#/$defs/WorkloadIR"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Inputs",
+      "type": "object"
+    },
+    "run_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "pattern": "^1\\.(0|[1-9][0-9]*)$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[.\\-+][0-9A-Za-z.\\-+]+)?$",
+      "title": "Tool Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool_version",
+    "artifact_type",
+    "created_at",
+    "run_id",
+    "data"
+  ],
+  "title": "WorkloadArtifact",
+  "type": "object"
+}

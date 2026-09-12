@@ -1,0 +1,115 @@
+{
+  "artifact_type": "recommendations",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data": {
+    "questions": [
+      {
+        "affected_recommendations": [
+          "TENANT-001"
+        ],
+        "answer_schema": "boolean",
+        "choices": [],
+        "derived_from": "inferred",
+        "id": "read_after_write_invoices",
+        "prompt": "Must invoice reads be immediately consistent?",
+        "unknown_is_acceptable": true,
+        "why_it_matters": "Decides whether invoice reads may be routed to a replica."
+      }
+    ],
+    "recommendations": [
+      {
+        "affected_objects": [
+          "public.orders.tenant_id",
+          "public.tenants.id"
+        ],
+        "alternatives": [],
+        "assumptions": [
+          {
+            "falsified_by": "A confirmed cross-tenant order.",
+            "statement": "Every order belongs to exactly one tenant."
+          }
+        ],
+        "blocking_question": null,
+        "category": "tenancy",
+        "evidence_refs": [
+          "ev-orm-relationship",
+          "ev-missing-constraint"
+        ],
+        "id": "TENANT-001",
+        "invalidating_context": [
+          {
+            "condition": "Tenancy becomes database-per-tenant.",
+            "question": "tenant_model"
+          }
+        ],
+        "measurement": null,
+        "priority": "required_for_correctness",
+        "proposed_change": {
+          "application_sketch": null,
+          "kind": "add_constraint",
+          "migration_sketch": null,
+          "rollback_note": "Drop the constraint.",
+          "sql_sketch": "ALTER TABLE orders ADD CONSTRAINT fk_orders_tenant_id FOREIGN KEY (tenant_id) REFERENCES tenants (id);",
+          "summary": "Add fk_orders_tenant_id."
+        },
+        "rule": "schema_integrity.orm_relationship_without_physical_fk",
+        "rule_version": 1,
+        "statement": "The ORM links orders to tenants, but PostgreSQL does not.",
+        "title": "Enforce tenant ownership for orders",
+        "trade_offs": [
+          {
+            "affects": "deployment",
+            "statement": "Adding the constraint validates existing rows."
+          }
+        ],
+        "verification_state": "not_eligible"
+      },
+      {
+        "affected_objects": [
+          "public.orders.tenant_id",
+          "public.orders.status"
+        ],
+        "alternatives": [],
+        "assumptions": [],
+        "blocking_question": null,
+        "category": "query",
+        "evidence_refs": [
+          "ev-index-measured"
+        ],
+        "id": "IDX-002",
+        "invalidating_context": [],
+        "measurement": {
+          "absolute_saving_us": 9520,
+          "control_median_us": 9760,
+          "fixture_scale": "orders 400000, seed synthetic-1",
+          "proof": "IDX-002@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "treatment_median_us": 240
+        },
+        "priority": "verified_improvement",
+        "proposed_change": {
+          "application_sketch": null,
+          "kind": "add_index",
+          "migration_sketch": null,
+          "rollback_note": null,
+          "sql_sketch": "CREATE INDEX ix_orders_tenant_status_created ON orders (tenant_id, status, created_at DESC);",
+          "summary": "Create ix_orders_tenant_status_created."
+        },
+        "rule": "workload_index.missing_composite_for_filter_and_order",
+        "rule_version": 1,
+        "statement": "No index supports the equality prefix followed by the ordered column.",
+        "title": "Add a composite index for the tenant order list",
+        "trade_offs": [],
+        "verification_state": "eligible"
+      }
+    ],
+    "unsupported_reasons": [
+      "Partition pruning is observed but not analysed in v1."
+    ]
+  },
+  "inputs": {
+    "repository": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
+  "schema_version": "1.0",
+  "tool_version": "0.1.0"
+}

@@ -1,0 +1,103 @@
+{
+  "artifact_type": "workload",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data": {
+    "boundary_note": "Two selected tests captured; the suite was not run in full.",
+    "coverage": "partial",
+    "failed_tests": 0,
+    "operations": [
+      {
+        "amplifications": [
+          {
+            "call_site": {
+              "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "end_line": null,
+              "line": 18,
+              "path": "app/repositories.py",
+              "symbol": "list_tenant_orders"
+            },
+            "child_query": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+            "classification": "observed_n_plus_one",
+            "parent_query": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+            "relationship_name": "items",
+            "repetitions": 20
+          }
+        ],
+        "entry_point": {
+          "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "end_line": null,
+          "line": 18,
+          "path": "app/repositories.py",
+          "symbol": "list_tenant_orders"
+        },
+        "id": "pytest::tests/test_orders.py::test_list_tenant_orders",
+        "observed_duration_us": 12000,
+        "observed_executions": 1,
+        "phase": "call",
+        "query_counts": {
+          "sha256:3333333333333333333333333333333333333333333333333333333333333333": 1,
+          "sha256:4444444444444444444444444444444444444444444444444444444444444444": 20
+        },
+        "tables_read": [
+          "public.orders"
+        ],
+        "tables_written": [],
+        "transactions": [
+          {
+            "committed": true,
+            "correlation_id": "txn-1",
+            "queries": [
+              "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+              "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            ]
+          }
+        ]
+      }
+    ],
+    "passed_tests": 2,
+    "queries": [
+      {
+        "call_sites": [
+          {
+            "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+            "end_line": null,
+            "line": 18,
+            "path": "app/repositories.py",
+            "symbol": "list_tenant_orders"
+          }
+        ],
+        "id": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "normalized_sql": "SELECT id FROM orders WHERE tenant_id = $1",
+        "parameters": [
+          {
+            "data_type": "integer",
+            "is_redacted": true,
+            "position": 1,
+            "value_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "relations": [
+          "public.orders"
+        ],
+        "statement_class": "read"
+      },
+      {
+        "call_sites": [],
+        "id": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "normalized_sql": "SELECT id FROM order_items WHERE order_id = $1",
+        "parameters": [],
+        "relations": [
+          "public.order_items"
+        ],
+        "statement_class": "read"
+      }
+    ],
+    "selected_tests": 2
+  },
+  "inputs": {
+    "repository": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
+  "schema_version": "1.0",
+  "tool_version": "0.1.0"
+}

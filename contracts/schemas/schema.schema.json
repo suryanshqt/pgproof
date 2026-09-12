@@ -1,0 +1,635 @@
+{
+  "$defs": {
+    "ArtifactType": {
+      "description": "Every top-level artifact this contract version defines.",
+      "enum": [
+        "schema",
+        "code",
+        "workload",
+        "context",
+        "evidence",
+        "recommendations",
+        "scenarios",
+        "graph",
+        "stages",
+        "proofs"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "ColumnIR": {
+      "properties": {
+        "data_type": {
+          "minLength": 1,
+          "title": "Data Type",
+          "type": "string"
+        },
+        "default_expression": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Expression"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "is_generated": {
+          "default": false,
+          "title": "Is Generated",
+          "type": "boolean"
+        },
+        "is_identity": {
+          "default": false,
+          "title": "Is Identity",
+          "type": "boolean"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "nullable": {
+          "title": "Nullable",
+          "type": "boolean"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SchemaProvenance"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "data_type",
+        "nullable",
+        "provenance"
+      ],
+      "title": "ColumnIR",
+      "type": "object"
+    },
+    "ConstraintIR": {
+      "properties": {
+        "columns": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "expression": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expression"
+        },
+        "introduced_by": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-z][0-9a-z_]{0,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Introduced By"
+        },
+        "kind": {
+          "$ref": "#/$defs/ConstraintKind"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "on_delete": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReferentialAction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "on_update": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReferentialAction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "provenance": {
+          "$ref": "#/$defs/SchemaProvenance"
+        },
+        "referenced_columns": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Referenced Columns",
+          "type": "array"
+        },
+        "referenced_table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Referenced Table"
+        },
+        "table": {
+          "title": "Table",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "table",
+        "provenance"
+      ],
+      "title": "ConstraintIR",
+      "type": "object"
+    },
+    "ConstraintKind": {
+      "enum": [
+        "primary_key",
+        "foreign_key",
+        "unique",
+        "check",
+        "not_null",
+        "exclusion"
+      ],
+      "title": "ConstraintKind",
+      "type": "string"
+    },
+    "IndexIR": {
+      "properties": {
+        "included_columns": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Included Columns",
+          "type": "array"
+        },
+        "introduced_by": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-z][0-9a-z_]{0,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Introduced By"
+        },
+        "is_unique": {
+          "default": false,
+          "title": "Is Unique",
+          "type": "boolean"
+        },
+        "keys": {
+          "items": {
+            "$ref": "#/$defs/IndexKeyIR"
+          },
+          "title": "Keys",
+          "type": "array"
+        },
+        "method": {
+          "$ref": "#/$defs/IndexMethod",
+          "default": "btree"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "predicate": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Predicate"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SchemaProvenance"
+        },
+        "table": {
+          "title": "Table",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "table",
+        "keys",
+        "provenance"
+      ],
+      "title": "IndexIR",
+      "type": "object"
+    },
+    "IndexKeyIR": {
+      "properties": {
+        "column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        },
+        "direction": {
+          "$ref": "#/$defs/SortDirection",
+          "default": "asc"
+        },
+        "expression": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expression"
+        }
+      },
+      "title": "IndexKeyIR",
+      "type": "object"
+    },
+    "IndexMethod": {
+      "enum": [
+        "btree",
+        "hash",
+        "gist",
+        "gin",
+        "spgist",
+        "brin"
+      ],
+      "title": "IndexMethod",
+      "type": "string"
+    },
+    "ReferentialAction": {
+      "enum": [
+        "no_action",
+        "restrict",
+        "cascade",
+        "set_null",
+        "set_default"
+      ],
+      "title": "ReferentialAction",
+      "type": "string"
+    },
+    "SchemaIR": {
+      "description": "The reconstructed database design.",
+      "properties": {
+        "constraints": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ConstraintIR"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "extensions": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Extensions",
+          "type": "array"
+        },
+        "indexes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/IndexIR"
+          },
+          "title": "Indexes",
+          "type": "array"
+        },
+        "migration_head": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-z][0-9a-z_]{0,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Migration Head"
+        },
+        "migration_revisions": {
+          "default": [],
+          "items": {
+            "pattern": "^[0-9a-z][0-9a-z_]{0,63}$",
+            "type": "string"
+          },
+          "title": "Migration Revisions",
+          "type": "array"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SchemaProvenance"
+        },
+        "tables": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/TableIR"
+          },
+          "title": "Tables",
+          "type": "array"
+        },
+        "unsupported": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/UnsupportedConstruct"
+          },
+          "title": "Unsupported",
+          "type": "array"
+        }
+      },
+      "required": [
+        "provenance"
+      ],
+      "title": "SchemaIR",
+      "type": "object"
+    },
+    "SchemaProvenance": {
+      "description": "Where a schema fact came from.",
+      "enum": [
+        "physical_catalog",
+        "static_migration",
+        "orm_declaration",
+        "unresolved"
+      ],
+      "title": "SchemaProvenance",
+      "type": "string"
+    },
+    "SortDirection": {
+      "enum": [
+        "asc",
+        "desc"
+      ],
+      "title": "SortDirection",
+      "type": "string"
+    },
+    "SourceRef": {
+      "description": "A location in the analysed repository.",
+      "properties": {
+        "content_hash": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "end_line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Line"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "path": {
+          "description": "Repository-relative POSIX path.",
+          "pattern": "^(?!.*//)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![A-Za-z]:)[^/\\\\\\x00~][^\\\\\\x00]*(?<!/)$",
+          "title": "Path",
+          "type": "string"
+        },
+        "symbol": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Symbol"
+        }
+      },
+      "required": [
+        "path",
+        "content_hash"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    },
+    "TableIR": {
+      "properties": {
+        "columns": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ColumnIR"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "comment": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Comment"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SchemaProvenance"
+        },
+        "schema_name": {
+          "minLength": 1,
+          "title": "Schema Name",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "schema_name",
+        "name",
+        "provenance"
+      ],
+      "title": "TableIR",
+      "type": "object"
+    },
+    "UnsupportedConstruct": {
+      "description": "A construct the parser saw but declined to interpret.\n\n`docs/PRODUCT_SPEC.md` section 7 forbids hiding unsupported inputs, so these\nare first-class contract data rather than log output.",
+      "properties": {
+        "kind": {
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "reason"
+      ],
+      "title": "UnsupportedConstruct",
+      "type": "object"
+    }
+  },
+  "$id": "https://pgproof.dev/contracts/1.0/schema.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Transport envelope for the pgproof schema artifact, contract schema version 1.0.",
+  "properties": {
+    "artifact_type": {
+      "$ref": "#/$defs/ArtifactType"
+    },
+    "created_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$",
+      "title": "Created At",
+      "type": "string"
+    },
+    "data": {
+      "$ref": "#/$defs/SchemaIR"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Inputs",
+      "type": "object"
+    },
+    "run_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "pattern": "^1\\.(0|[1-9][0-9]*)$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[.\\-+][0-9A-Za-z.\\-+]+)?$",
+      "title": "Tool Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool_version",
+    "artifact_type",
+    "created_at",
+    "run_id",
+    "data"
+  ],
+  "title": "SchemaArtifact",
+  "type": "object"
+}
