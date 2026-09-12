@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.27"]
+requires = ["hatchling==1.32.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "Local-first PostgreSQL design reviewer and experimental performance lab for SQLAlchemy and Alembic projects"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "pgproof contributors" }]
 keywords = ["postgresql", "sqlalchemy", "alembic", "database-design", "code-analysis"]
 classifiers = [
@@ -33,6 +35,9 @@ pgproof = "pgproof.cli.app:main"
 
 [dependency-groups]
 dev = [
+  # Mirrors the exact [build-system] requirement so uv.lock records the
+  # build backend version; uv lockfile v1 does not lock build backends itself.
+  "hatchling==1.32.0",
   "mypy>=1.14",
   "pytest>=8.3",
   "pytest-cov>=6.0",
@@ -43,7 +48,7 @@ dev = [
 packages = ["src/pgproof"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/pgproof", "tests", "docs", "CONTRIBUTING.md", "README.md"]
+include = ["src/pgproof", "tests", "docs", "CONTRIBUTING.md", "LICENSE", "README.md"]
 
 [tool.ruff]
 line-length = 100

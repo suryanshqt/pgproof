@@ -50,3 +50,7 @@ uv build
 ```
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full command reference.
+
+## License
+
+Apache License 2.0. See [`LICENSE`](LICENSE).
