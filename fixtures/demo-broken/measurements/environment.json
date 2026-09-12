@@ -1,0 +1,25 @@
+{
+  "environment_version": 1,
+  "purpose": "Declared contract every committed run must satisfy. Separate from the run files on purpose: a run recorded against a different dataset or different session settings must be rejected rather than quietly averaged in.",
+  "dataset": {
+    "orders": 400000,
+    "order_items": 800000,
+    "total_cents_checksum": 1697400000
+  },
+  "session_settings": [
+    "SET max_parallel_workers_per_gather = 0",
+    "SET jit = off",
+    "SET statement_timeout = '30s'"
+  ],
+  "sources": {
+    "postgres_digest": "fixtures/benchmark-corpus.yaml runtime.postgres_digest",
+    "server_version": "fixtures/benchmark-corpus.yaml runtime.postgres_server_version",
+    "client_versions": "fixtures/demo-broken/uv.lock",
+    "python_version": "fixtures/demo-broken/.python-version",
+    "query_and_index": "cases.json in this directory"
+  },
+  "not_pinned": {
+    "host": "OS and architecture are compared across runs for consistency but not pinned to a value, so a Linux reproducer can commit its own session.",
+    "recorded_at": "Timestamps must agree across a session but are not pinned."
+  }
+}

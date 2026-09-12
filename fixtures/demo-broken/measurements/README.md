@@ -9,6 +9,7 @@ savings and ratios instead of trusting them.
 | Path | Contents |
 |---|---|
 | `cases.json` | The exact SQL, parameters, index name and index DDL measured. Input to `collect`. |
+| `environment.json` | Declared dataset facts and session settings every run must match. |
 | `<case>/run-N.json` | One complete A1/B/A2 experiment: all warmups and all samples. |
 | `<case>/plan-a1.json` | `EXPLAIN` for the control arm, timing disabled. |
 | `<case>/plan-b.json` | `EXPLAIN` for the treatment arm, timing disabled. |
@@ -37,6 +38,30 @@ it is the control, not the subject.
 | `host` | OS and architecture only. No machine name, user or path. |
 | `session_settings` | The exact `SET` statements applied before timing. |
 | `formulas` | The arithmetic, written out, so the statistics are checkable. |
+
+## Required inventory
+
+Exactly `IDX-001` runs 1, 2, 3 and `IDX-002` runs 1, 2, 3. No duplicate, missing
+or additional identifier is accepted, and each file's declared `case_id` and
+`run` must match its own path. Accepting "any non-empty set" would let a noisy
+run be deleted and the remainder re-summarised without the omission showing.
+
+## Provenance every run must match
+
+| Field | Declared by |
+|---|---|
+| `server.image_digest` | `fixtures/benchmark-corpus.yaml` `runtime.postgres_digest` |
+| `server.version` | `fixtures/benchmark-corpus.yaml` `runtime.postgres_server_version` |
+| `client.{sqlalchemy,alembic,psycopg,pytest}` | `fixtures/demo-broken/uv.lock` |
+| `client.python` | `fixtures/demo-broken/.python-version` |
+| `dataset` | `environment.json` |
+| `session_settings` | `environment.json` |
+| `query.sql`, `query.params`, `index.name`, `index.ddl` | `cases.json` |
+
+All runs in one committed session must additionally agree with each other on
+`host`, `client`, `server`, `session_settings` and `recorded_at`. Host
+architecture is compared across runs but not pinned to a value, so a reproducer
+on another platform can commit its own session.
 
 ## Formulas
 

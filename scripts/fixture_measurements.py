@@ -14,7 +14,9 @@ import platform
 import re
 import statistics
 import sys
+import tomllib
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +33,12 @@ FORMULAS = {
 }
 
 ARMS = ("control_a1", "treatment_b", "drift_control_a2")
+
+# Exact inventory. Accepting "any non-empty set" would let a noisy run be deleted
+# and the remaining ones re-summarised without the omission being visible.
+EXPECTED_RUNS: dict[str, tuple[int, ...]] = {"IDX-001": (1, 2, 3), "IDX-002": (1, 2, 3)}
+
+PINNED_CLIENTS = ("sqlalchemy", "alembic", "psycopg", "pytest")
 
 GENERATED_BEGIN = "<!-- generated-from-raw-evidence:begin -->"
 GENERATED_END = "<!-- generated-from-raw-evidence:end -->"
@@ -116,12 +124,254 @@ def validate_run(run: dict[str, Any]) -> list[str]:
 # Loading committed evidence
 # --------------------------------------------------------------------------- #
 def load_runs(measurements: Path) -> list[dict[str, Any]]:
-    runs = [
-        json.loads(path.read_text(encoding="utf-8"))
-        for path in sorted(measurements.glob("*/run-*.json"))
-    ]
-    runs.sort(key=lambda run: (run["case_id"], run["run"]))
+    runs, _ = load_runs_safely(measurements)
     return runs
+
+
+def load_runs_safely(measurements: Path) -> tuple[list[dict[str, Any]], list[str]]:
+    """Load run documents without raising on malformed or unreadable evidence."""
+    runs: list[dict[str, Any]] = []
+    problems: list[str] = []
+    for path in sorted(measurements.glob("*/run-*.json")):
+        name = str(path.relative_to(measurements))
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            problems.append(f"{name}: unreadable or malformed JSON ({error})")
+            continue
+        if not isinstance(document, dict):
+            problems.append(f"{name}: expected a JSON object")
+            continue
+        for required in ("case_id", "run", "arms"):
+            if required not in document:
+                problems.append(f"{name}: missing required field {required!r}")
+                break
+        else:
+            runs.append(document)
+    runs.sort(key=lambda run: (str(run.get("case_id")), int(run.get("run", 0))))
+    return runs, problems
+
+
+def expected_run_path(measurements: Path, case: str, run: int) -> Path:
+    return measurements / case.lower() / f"run-{run}.json"
+
+
+def validate_run_files(measurements: Path) -> list[str]:
+    """Every expected run file exists, and its contents match its own path."""
+    problems: list[str] = []
+    expected_paths: set[Path] = set()
+    for case, numbers in EXPECTED_RUNS.items():
+        for number in numbers:
+            path = expected_run_path(measurements, case, number)
+            expected_paths.add(path)
+            if not path.is_file():
+                problems.append(f"{case} run {number}: {path.name} is missing")
+                continue
+            try:
+                document = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as error:
+                problems.append(f"{case} run {number}: unreadable ({error})")
+                continue
+            if document.get("case_id") != case or document.get("run") != number:
+                problems.append(
+                    f"{path.name} declares {document.get('case_id')} run "
+                    f"{document.get('run')}, which does not match its path"
+                )
+    for path in sorted(measurements.glob("*/run-*.json")):
+        if path not in expected_paths:
+            problems.append(f"{path.relative_to(measurements)}: unexpected run file")
+    return problems
+
+
+def validate_run_inventory(runs: Sequence[dict[str, Any]]) -> list[str]:
+    """Exactly the expected identifiers, each exactly once."""
+    observed: dict[tuple[str, int], int] = {}
+    for run in runs:
+        key = (str(run.get("case_id")), int(run.get("run", 0)))
+        observed[key] = observed.get(key, 0) + 1
+    problems: list[str] = []
+    for case, numbers in EXPECTED_RUNS.items():
+        for number in numbers:
+            count = observed.get((case, number), 0)
+            if count == 0:
+                problems.append(f"{case}: run {number} is missing from the inventory")
+            elif count > 1:
+                problems.append(f"{case}: run {number} appears {count} times")
+    for case, number in sorted(observed):
+        if case not in EXPECTED_RUNS:
+            problems.append(f"unexpected case {case} in the inventory")
+        elif number not in EXPECTED_RUNS[case]:
+            problems.append(f"{case}: unexpected run {number} in the inventory")
+    return problems
+
+
+@dataclass(frozen=True)
+class Provenance:
+    """Declared sources every run is validated against."""
+
+    postgres_digest: str
+    server_version: str
+    client_versions: dict[str, str]
+    python_version: str
+    dataset: dict[str, int]
+    session_settings: list[str]
+    cases: dict[str, dict[str, Any]]
+
+
+def load_provenance(measurements: Path) -> tuple[Provenance | None, list[str]]:
+    """Read the declared sources. yaml is imported lazily: the fixture environment
+    that runs `collect` and `nplus1` does not install it."""
+    import yaml
+
+    fixture = measurements.parent
+    corpus_path = fixture.parent / "benchmark-corpus.yaml"
+    lock_path = fixture / "uv.lock"
+    python_path = fixture / ".python-version"
+    environment_path = measurements / "environment.json"
+    cases_path = measurements / "cases.json"
+
+    problems: list[str] = []
+    for path in (corpus_path, lock_path, python_path, environment_path, cases_path):
+        if not path.is_file():
+            problems.append(f"provenance source missing: {path.name}")
+    if problems:
+        return None, problems
+
+    try:
+        corpus = yaml.safe_load(corpus_path.read_text(encoding="utf-8"))
+        lock = tomllib.loads(lock_path.read_text(encoding="utf-8"))
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+        cases = json.loads(cases_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError) as error:
+        return None, [f"provenance source unreadable: {error}"]
+
+    locked = {package["name"]: package["version"] for package in lock["package"]}
+    missing = [name for name in PINNED_CLIENTS if name not in locked]
+    if missing:
+        return None, [f"lockfile does not pin {', '.join(missing)}"]
+
+    return (
+        Provenance(
+            postgres_digest=corpus["runtime"]["postgres_digest"],
+            server_version=str(corpus["runtime"]["postgres_server_version"]),
+            client_versions={name: locked[name] for name in PINNED_CLIENTS},
+            python_version=python_path.read_text(encoding="utf-8").strip(),
+            dataset=environment["dataset"],
+            session_settings=list(environment["session_settings"]),
+            cases={case["id"]: case for case in cases},
+        ),
+        [],
+    )
+
+
+def validate_provenance(run: dict[str, Any], provenance: Provenance) -> list[str]:
+    """One run agrees with every declared source."""
+    label = f"{run.get('case_id')} run {run.get('run')}"
+    problems: list[str] = []
+
+    server = run.get("server", {})
+    if server.get("image_digest") != provenance.postgres_digest:
+        problems.append(
+            f"{label}: image digest {server.get('image_digest')} is not the declared "
+            f"{provenance.postgres_digest}"
+        )
+    if server.get("version") != provenance.server_version:
+        problems.append(
+            f"{label}: server version {server.get('version')!r} is not the declared "
+            f"{provenance.server_version!r}"
+        )
+
+    client = run.get("client", {})
+    for name, version in provenance.client_versions.items():
+        if client.get(name) != version:
+            problems.append(f"{label}: {name} {client.get(name)} is not the locked {version}")
+    python_version = str(client.get("python", ""))
+    if not python_version.startswith(provenance.python_version):
+        problems.append(
+            f"{label}: python {python_version or 'missing'} does not match "
+            f".python-version {provenance.python_version}"
+        )
+
+    if run.get("dataset") != provenance.dataset:
+        problems.append(f"{label}: dataset {run.get('dataset')} is not the declared dataset")
+
+    if list(run.get("session_settings", [])) != provenance.session_settings:
+        problems.append(f"{label}: session settings differ from the declared settings")
+
+    case = provenance.cases.get(str(run.get("case_id")))
+    if case is None:
+        problems.append(f"{label}: no matching entry in cases.json")
+    else:
+        query = run.get("query", {})
+        index = run.get("index", {})
+        if query.get("sql") != case["sql"]:
+            problems.append(f"{label}: measured SQL differs from cases.json")
+        if list(query.get("params", [])) != list(case["params"]):
+            problems.append(f"{label}: measured parameters differ from cases.json")
+        if index.get("name") != case["index_name"]:
+            problems.append(
+                f"{label}: index {index.get('name')} is not the declared {case['index_name']}"
+            )
+        if index.get("ddl") != case["ddl"]:
+            problems.append(f"{label}: index DDL differs from cases.json")
+    return problems
+
+
+def validate_session_consistency(runs: Sequence[dict[str, Any]]) -> list[str]:
+    """Every run in one committed session shares an environment."""
+    problems: list[str] = []
+    for field in ("host", "client", "server", "session_settings", "recorded_at"):
+        observed = {json.dumps(run.get(field), sort_keys=True) for run in runs}
+        if len(observed) > 1:
+            problems.append(
+                f"runs disagree on {field}: {len(observed)} distinct values across the session"
+            )
+    return problems
+
+
+def validate_nplus1_evidence(measurements: Path) -> list[str]:
+    """Presence, shape, the 1+N invariant, and result equivalence."""
+    path = measurements / "nplus1-001" / "evidence.json"
+    if not path.is_file():
+        return ["nplus1-001/evidence.json is missing"]
+    try:
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        return [f"nplus1-001/evidence.json is unreadable or malformed ({error})"]
+    if not isinstance(evidence, dict):
+        return ["nplus1-001/evidence.json: expected a JSON object"]
+
+    fixtures = evidence.get("fixtures")
+    if not isinstance(fixtures, dict):
+        return ["nplus1-001/evidence.json: missing or malformed 'fixtures'"]
+
+    problems: list[str] = []
+    required = ("orders_returned", "select_statements", "totals_checksum", "order_ids")
+    for name in ("demo-broken", "demo-clean"):
+        entry = fixtures.get(name)
+        if not isinstance(entry, dict):
+            problems.append(f"nplus1 evidence: missing or malformed entry for {name}")
+            continue
+        for field in required:
+            if field not in entry:
+                problems.append(f"nplus1 evidence: {name} is missing {field!r}")
+        ids = entry.get("order_ids")
+        if isinstance(ids, list) and entry.get("orders_returned") != len(ids):
+            problems.append(
+                f"nplus1 evidence: {name} records {len(ids)} order ids for "
+                f"{entry.get('orders_returned')} orders"
+            )
+    if problems:
+        return problems
+
+    problems += [
+        f"nplus1 evidence: {problem}"
+        for problem in compare_nplus1(fixtures["demo-broken"], fixtures["demo-clean"], 2)
+    ]
+    for flag in ("broken_is_one_plus_n", "order_ids_identical", "checksums_identical"):
+        if evidence.get(flag) is not True:
+            problems.append(f"nplus1 evidence: {flag} is not true")
+    return problems
 
 
 def load_nplus1(measurements: Path) -> dict[str, Any]:
@@ -235,7 +485,8 @@ def render_tables(measurements: Path) -> str:
     lines += [
         "",
         f"`{broken['select_statements']} = 1 + {broken['orders_returned']}` in demo-broken; "
-        f"demo-clean issues {clean['select_statements']} regardless of row count. "
+        f"demo-clean issues {clean['select_statements']} statements for this operation "
+        f"returning {clean['orders_returned']} orders. "
         f"Order ids identical: {nplus1['order_ids_identical']}. "
         f"Checksums identical: {nplus1['checksums_identical']}.",
         "",
@@ -262,18 +513,38 @@ def extract_generated_block(notes: Path) -> str:
     return match.group(0)
 
 
-def check(measurements: Path, notes: Path) -> list[str]:
+def check(measurements: Path, notes: Path, provenance: Provenance | None = None) -> list[str]:
+    """Validate structure, inventory and provenance before computing any statistic.
+
+    Statistics are only compared once the evidence is known to be well formed, so
+    malformed input yields a named problem rather than an IndexError or KeyError.
+    """
     problems: list[str] = []
-    runs = load_runs(measurements)
-    if not runs:
-        return [f"no raw runs under {measurements}"]
+    runs, load_problems = load_runs_safely(measurements)
+    problems += load_problems
+    problems += validate_run_files(measurements)
+    problems += validate_run_inventory(runs)
     for run in runs:
-        problems.extend(validate_run(run))
-    for case in case_ids(runs):
+        problems += validate_run(run)
+
+    if provenance is None:
+        provenance, provenance_problems = load_provenance(measurements)
+        problems += provenance_problems
+    if provenance is not None:
+        for run in runs:
+            problems += validate_provenance(run, provenance)
+    problems += validate_session_consistency(runs)
+
+    for case in EXPECTED_RUNS:
         case_dir = measurements / case.lower()
         for plan in ("plan-a1.json", "plan-b.json"):
             if not (case_dir / plan).is_file():
                 problems.append(f"{case}: missing plan evidence {plan}")
+    problems += validate_nplus1_evidence(measurements)
+
+    if problems:
+        return problems
+
     committed = measurements / "summary.json"
     if not committed.is_file():
         problems.append("missing summary.json")

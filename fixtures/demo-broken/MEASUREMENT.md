@@ -117,7 +117,7 @@ Saving ranges from 9.52 ms to 9.74 ms; the control-to-treatment ratio ranges fro
 | demo-broken | 20 | 21 | 199840 |
 | demo-clean | 20 | 2 | 199840 |
 
-`21 = 1 + 20` in demo-broken; demo-clean issues 2 regardless of row count. Order ids identical: True. Checksums identical: True.
+`21 = 1 + 20` in demo-broken; demo-clean issues 2 statements for this operation returning 20 orders. Order ids identical: True. Checksums identical: True.
 
 <!-- generated-from-raw-evidence:end -->
 
