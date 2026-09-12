@@ -1,0 +1,113 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pgproof"
+version = "0.1.0"
+description = "Local-first PostgreSQL design reviewer and experimental performance lab for SQLAlchemy and Alembic projects"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "pgproof contributors" }]
+keywords = ["postgresql", "sqlalchemy", "alembic", "database-design", "code-analysis"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Database",
+  "Topic :: Software Development :: Quality Assurance",
+  "Typing :: Typed",
+]
+dependencies = ["click>=8.1.7"]
+
+[project.urls]
+Homepage = "https://github.com/suryanshqt/pgproof"
+Repository = "https://github.com/suryanshqt/pgproof"
+Issues = "https://github.com/suryanshqt/pgproof/issues"
+
+[project.scripts]
+pgproof = "pgproof.cli.app:main"
+
+[dependency-groups]
+dev = [
+  "mypy>=1.14",
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+  "ruff>=0.9",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pgproof"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/pgproof", "tests", "docs", "CONTRIBUTING.md", "README.md"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+# Pinned so a ruff upgrade cannot start reformatting code blocks inside the
+# accepted design documents under docs/ and ideation/.
+include = ["*.py", "*.pyi", "**/pyproject.toml"]
+
+[tool.ruff.lint]
+select = [
+  "A",    # builtin shadowing
+  "ANN",  # annotations
+  "ARG",  # unused arguments
+  "B",    # bugbear
+  "C4",   # comprehensions
+  "E",    # pycodestyle errors
+  "F",    # pyflakes
+  "I",    # import order
+  "N",    # naming
+  "PT",   # pytest style
+  "PTH",  # prefer pathlib
+  "RET",  # return simplification
+  "RUF",  # ruff-specific
+  "SIM",  # simplification
+  "TID",  # tidy imports
+  "UP",   # pyupgrade
+  "W",    # pycodestyle warnings
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src", "tests"]
+strict = true
+warn_unreachable = true
+enable_error_code = [
+  "explicit-override",
+  "ignore-without-code",
+  "possibly-undefined",
+  "redundant-expr",
+  "truthy-bool",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = [
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--cov",
+  "--cov-report=term-missing",
+]
+xfail_strict = true
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source_pkgs = ["pgproof"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
