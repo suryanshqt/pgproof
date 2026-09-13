@@ -1,6 +1,7 @@
 """Layer-boundary enforcement for the dependency rule in ARCHITECTURE.md section 4."""
 
 import ast
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -8,7 +9,18 @@ import pytest
 
 SRC = Path(__file__).parents[2] / "src"
 
-_LAYERS = frozenset({"adapters", "application", "cli", "domain", "local_api", "ports", "rules"})
+_LAYERS = frozenset(
+    {
+        "adapters",
+        "application",
+        "cli",
+        "contracts",
+        "domain",
+        "local_api",
+        "ports",
+        "rules",
+    }
+)
 
 # Every top-level package under src/pgproof must appear here, so a new layer cannot
 # silently escape the dependency rule.
@@ -18,6 +30,10 @@ ALLOWED_INTERNAL: dict[str, frozenset[str]] = {
     "application": frozenset({"application", "domain", "ports"}),
     "rules": frozenset({"domain", "rules"}),
     "adapters": frozenset({"adapters", "domain", "ports"}),
+    # Generated contract resources. Reads packaged JSON Schemas, so it may touch
+    # the filesystem, which is why it is a layer of its own rather than part of
+    # the pure domain.
+    "contracts": frozenset({"contracts", "domain"}),
     "cli": _LAYERS,
     "local_api": _LAYERS,
 }
@@ -53,11 +69,15 @@ _IO_MODULES = frozenset(
 )
 
 BANNED_EXTERNAL: dict[str, frozenset[str]] = {
-    "domain": _INFRASTRUCTURE,
+    # The domain carries no I/O either. It defines the contract; BE-04 owns
+    # reading and writing it. Pydantic is permitted, per TECHNICAL_DESIGN
+    # section 1, because the transport models generate the JSON Schemas.
+    "domain": _INFRASTRUCTURE | _IO_MODULES,
     "ports": _INFRASTRUCTURE,
     "application": _INFRASTRUCTURE,
     "rules": _INFRASTRUCTURE | _IO_MODULES,
     "adapters": frozenset(),
+    "contracts": _INFRASTRUCTURE,
     "cli": frozenset(),
     "local_api": frozenset(),
 }
@@ -160,3 +180,49 @@ def test_violations_are_detected(module: str, source: str, expected: str) -> Non
 )
 def test_permitted_imports_pass(module: str, source: str) -> None:
     assert check_module(module, source) == []
+
+
+def test_domain_is_pure_and_uses_only_the_sanctioned_transport_library() -> None:
+    """The domain may import Pydantic and the standard library, nothing else."""
+    allowed_third_party = {"pydantic"}
+    seen: set[str] = set()
+    for module, source in _source_modules():
+        if _layer_of(module) != "domain":
+            continue
+        for _lineno, name in _imports(source):
+            assert name is not None, f"{module}: relative import"
+            root = name.split(".")[0]
+            if root in {"pgproof"} or root in sys.stdlib_module_names:
+                continue
+            seen.add(root)
+    assert seen <= allowed_third_party, f"domain imports unsanctioned packages: {sorted(seen)}"
+    assert "pydantic" in seen, "the domain should define its transport models with Pydantic"
+
+
+def test_domain_performs_no_filesystem_access() -> None:
+    problems = [
+        problem
+        for module, source in _source_modules()
+        if _layer_of(module) == "domain"
+        for problem in check_module(module, source)
+    ]
+    assert problems == []
+    for module, source in _source_modules():
+        if _layer_of(module) != "domain":
+            continue
+        for _lineno, name in _imports(source):
+            assert name is not None
+            assert name.split(".")[0] not in _IO_MODULES, f"{module} imports {name}"
+
+
+def test_contracts_layer_may_read_packaged_resources() -> None:
+    """The resource accessor is allowed filesystem access; the domain is not."""
+    modules = {module for module, _ in _source_modules() if _layer_of(module) == "contracts"}
+    assert modules, "the contracts layer should exist once schemas are generated"
+    problems = [
+        problem
+        for module, source in _source_modules()
+        if _layer_of(module) == "contracts"
+        for problem in check_module(module, source)
+    ]
+    assert problems == []

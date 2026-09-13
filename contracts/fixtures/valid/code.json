@@ -1,0 +1,66 @@
+{
+  "artifact_type": "code",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data": {
+    "models": [
+      {
+        "class_name": "Order",
+        "mapped_columns": [
+          "public.orders.id",
+          "public.orders.tenant_id"
+        ],
+        "module_path": "app/models.py",
+        "source": {
+          "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "end_line": null,
+          "line": 31,
+          "path": "app/models.py",
+          "symbol": "Order.tenant_id"
+        },
+        "table": "public.orders"
+      }
+    ],
+    "operations": [
+      {
+        "name": "list_tenant_orders",
+        "qualified_name": "app.repositories.list_tenant_orders",
+        "source": {
+          "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "end_line": null,
+          "line": 18,
+          "path": "app/repositories.py",
+          "symbol": "list_tenant_orders"
+        }
+      }
+    ],
+    "orm": "sqlalchemy",
+    "relationships": [
+      {
+        "back_populates": null,
+        "cardinality": "many_to_one",
+        "cascade": [],
+        "loading_strategy": "select",
+        "name": "tenant",
+        "passive_deletes": false,
+        "physical_constraint": null,
+        "secondary_table": null,
+        "source": {
+          "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "end_line": null,
+          "line": 31,
+          "path": "app/models.py",
+          "symbol": "Order.tenant_id"
+        },
+        "source_table": "public.orders",
+        "target_table": "public.tenants"
+      }
+    ],
+    "unsupported": []
+  },
+  "inputs": {
+    "repository": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
+  "schema_version": "1.0",
+  "tool_version": "0.1.0"
+}

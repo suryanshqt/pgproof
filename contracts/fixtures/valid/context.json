@@ -1,0 +1,51 @@
+{
+  "artifact_type": "context",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data": {
+    "answers": [
+      {
+        "note": null,
+        "question": "critical_operations",
+        "state": "answered",
+        "value": "list tenant orders"
+      },
+      {
+        "note": "Not yet decided by the team.",
+        "question": "rpo",
+        "state": "unknown",
+        "value": null
+      }
+    ],
+    "consistency_requirements": [
+      {
+        "lag_tolerance_seconds": null,
+        "operation_label": "checkout",
+        "requires_read_after_write": true
+      }
+    ],
+    "critical_operations": [
+      "list tenant orders"
+    ],
+    "peak_requests_per_second": 100,
+    "read_write_ratio": "80:20",
+    "retention_constraints": [
+      "Orders retained for seven years."
+    ],
+    "rpo": null,
+    "rto": null,
+    "table_scales": [
+      {
+        "current_rows": "400000",
+        "rows_in_twelve_months": "1000000",
+        "table": "public.orders"
+      }
+    ],
+    "tenant_model": "shared_schema_tenant_id"
+  },
+  "inputs": {
+    "repository": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
+  "schema_version": "1.0",
+  "tool_version": "0.1.0"
+}

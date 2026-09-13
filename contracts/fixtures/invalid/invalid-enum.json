@@ -1,0 +1,58 @@
+{
+  "artifact_type": "evidence",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data": {
+    "refs": [
+      {
+        "content_hash": null,
+        "fixture_scale": null,
+        "id": "ev-orm-relationship",
+        "kind": "assumed",
+        "source": {
+          "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "end_line": null,
+          "line": 31,
+          "path": "app/models.py",
+          "symbol": "Order.tenant_id"
+        },
+        "summary": "Order.tenant_id declares a foreign key to tenants.id."
+      },
+      {
+        "content_hash": null,
+        "fixture_scale": null,
+        "id": "ev-missing-constraint",
+        "kind": "observed",
+        "source": {
+          "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "end_line": null,
+          "line": 30,
+          "path": "migrations/versions/0002_orders.py",
+          "symbol": null
+        },
+        "summary": "Migration 6a912ef4c1b8 creates the column without a constraint."
+      },
+      {
+        "content_hash": null,
+        "fixture_scale": null,
+        "id": "ev-tenant-model",
+        "kind": "user_confirmed",
+        "source": null,
+        "summary": "Tenancy is shared-schema with a tenant_id column."
+      },
+      {
+        "content_hash": null,
+        "fixture_scale": "orders 400000, seed synthetic-1",
+        "id": "ev-index-measured",
+        "kind": "verified_in_fixture",
+        "source": null,
+        "summary": "Composite index removed the sort in the declared fixture."
+      }
+    ]
+  },
+  "inputs": {
+    "repository": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
+  "schema_version": "1.0",
+  "tool_version": "0.1.0"
+}

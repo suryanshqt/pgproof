@@ -1,0 +1,64 @@
+{
+  "artifact_type": "graph",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data": {
+    "edges": [
+      {
+        "id": "edge:contains:orders:tenant_id",
+        "kind": "contains",
+        "label": null,
+        "source": "table:public.orders",
+        "status": "current",
+        "target": "column:public.orders.tenant_id"
+      },
+      {
+        "id": "edge:orm_only:orders:tenants",
+        "kind": "orm_only_relationship",
+        "label": "ORM only",
+        "source": "table:public.orders",
+        "status": "current",
+        "target": "table:public.does_not_exist"
+      },
+      {
+        "id": "edge:proposed_fk:orders:tenants",
+        "kind": "physical_foreign_key",
+        "label": "fk_orders_tenant_id",
+        "source": "table:public.orders",
+        "status": "proposed_addition",
+        "target": "table:public.tenants"
+      }
+    ],
+    "nodes": [
+      {
+        "attributes": {
+          "schema": "public"
+        },
+        "id": "table:public.orders",
+        "kind": "table",
+        "label": "orders",
+        "status": "current"
+      },
+      {
+        "attributes": {},
+        "id": "table:public.tenants",
+        "kind": "table",
+        "label": "tenants",
+        "status": "current"
+      },
+      {
+        "attributes": {},
+        "id": "column:public.orders.tenant_id",
+        "kind": "column",
+        "label": "tenant_id",
+        "status": "current"
+      }
+    ],
+    "view": "current"
+  },
+  "inputs": {
+    "repository": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
+  "schema_version": "1.0",
+  "tool_version": "0.1.0"
+}

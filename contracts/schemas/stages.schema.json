@@ -1,0 +1,213 @@
+{
+  "$defs": {
+    "StageName": {
+      "description": "The visible, cacheable stages listed in `ideation/03-product-experience.md`.",
+      "enum": [
+        "repository_inventory",
+        "schema_reconstruction",
+        "context_resolution",
+        "migration_sandbox",
+        "query_capture",
+        "dataset_build",
+        "candidate_screening",
+        "physical_verification",
+        "report_generation"
+      ],
+      "title": "StageName",
+      "type": "string"
+    },
+    "StageSet": {
+      "description": "Every stage of one run, in declared order.",
+      "properties": {
+        "stages": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/StageSummary"
+          },
+          "title": "Stages",
+          "type": "array"
+        }
+      },
+      "title": "StageSet",
+      "type": "object"
+    },
+    "StageStatus": {
+      "enum": [
+        "pending",
+        "running",
+        "complete",
+        "partial",
+        "failed",
+        "cancelled"
+      ],
+      "title": "StageStatus",
+      "type": "string"
+    },
+    "StageSummary": {
+      "description": "The outcome of one stage.\n\nDurations are integer microseconds per `docs/TECHNICAL_DESIGN.md` section 4\nand are formatted at presentation, not here.",
+      "properties": {
+        "boundary_note": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Boundary Note"
+        },
+        "cache_key": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Key"
+        },
+        "duration_us": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Us"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ended At"
+        },
+        "failure_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Reason"
+        },
+        "input_hashes": {
+          "additionalProperties": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "title": "Input Hashes",
+          "type": "object"
+        },
+        "stage": {
+          "$ref": "#/$defs/StageName"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
+        "status": {
+          "$ref": "#/$defs/StageStatus"
+        },
+        "warnings": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "stage",
+        "status"
+      ],
+      "title": "StageSummary",
+      "type": "object"
+    }
+  },
+  "$id": "https://pgproof.dev/contracts/1.0/stages.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Transport envelope for the pgproof stages artifact, contract schema version 1.0.",
+  "properties": {
+    "artifact_type": {
+      "const": "stages",
+      "title": "Artifact Type",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$",
+      "title": "Created At",
+      "type": "string"
+    },
+    "data": {
+      "$ref": "#/$defs/StageSet"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Inputs",
+      "type": "object"
+    },
+    "run_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "pattern": "^1\\.(0|[1-9][0-9]*)$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[.\\-+][0-9A-Za-z.\\-+]+)?$",
+      "title": "Tool Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool_version",
+    "artifact_type",
+    "created_at",
+    "run_id",
+    "data"
+  ],
+  "title": "StagesArtifact",
+  "type": "object"
+}

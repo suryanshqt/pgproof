@@ -47,8 +47,47 @@ jobs:
       - name: Type-check
         run: uv run mypy
 
+      - name: Check generated JSON Schemas for drift
+        run: uv run python scripts/generate_contracts.py --check
+
       - name: Test with coverage
         run: uv run pytest
+
+  contracts:
+    name: Contract types (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: contracts/types/package-lock.json
+
+      - name: Install the pinned contract toolchain
+        run: npm ci
+        working-directory: contracts/types
+
+      - name: Check generated JSON Schemas for drift
+        run: uv run python scripts/generate_contracts.py --check
+
+      - name: Check generated TypeScript for drift
+        run: npm run check
+        working-directory: contracts/types
+
+      - name: Compile the generated types
+        run: npm run compile
+        working-directory: contracts/types
+
+      - name: Validate the frozen fixtures with Ajv
+        run: npm run validate:fixtures
+        working-directory: contracts/types
 
   fixtures:
     name: Fixture integration (PostgreSQL 17)
