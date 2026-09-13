@@ -46,10 +46,63 @@ over-claims.
 
 ## Enum policy
 
-Any change to a stable enum, **including adding a member**, is a major contract
-change. An unknown enum value is rejected by Pydantic, by independent JSON Schema
-validation, and by Ajv, including when the document declares a higher compatible
-minor. See [ADR 0001](../docs/adr/0001-contract-versioning.md) rule 5.
+Two rules, because two different things were being conflated.
+
+**Closed semantic enums** — `EvidenceKind`, `RecommendationPriority`,
+`VerificationState`, `ProofVerdict`, `EdgeKind` and the rest of the domain
+vocabulary. Adding, removing or renaming a member is a **major** change, and an
+unknown value is rejected by Pydantic, by independent JSON Schema validation and
+by Ajv, including when the document declares a higher compatible minor.
+
+**The artifact-kind registry** — `ArtifactType`. Adding a new independent
+artifact kind is a **minor** change; removing or renaming one is major. An older
+reader keeps reading every kind it knows and rejects an unknown kind only when
+explicitly asked to parse one, naming the kinds it does know.
+
+That split matters concretely: `project` (BE-04), `migration-plan` (BE-14) and
+`decisions` (BE-33) are still to come. A blanket major-only rule would have
+forced a major bump merely to finish the declared roadmap.
+
+Each per-artifact schema is **strictly discriminated**: its `artifact_type` is a
+`const` of that one kind, so a `code` document cannot validate against the
+`schema` contract in Python, in `jsonschema`, or in Ajv. The generated
+TypeScript reflects it too — `schema.ts` declares
+`export type ArtifactType = "schema"`.
+
+See [ADR 0001](../docs/adr/0001-contract-versioning.md) rules 5 and 6.
+
+## Composite identity framing
+
+Composite identities use canonical compact JSON framing rather than delimiter
+joining, because a PostgreSQL logical name may contain any delimiter. Two real
+collisions motivated it:
+
+```text
+column_id(table_id("a", "b,c"), "d")     joined to  a.b,c.d
+table_id("a", "b"), table_id("c", "d")   joined to  a.b,c.d
+
+SourceRef(path="app/model#1")            joined to  app/model#1@<hash>
+SourceRef(path="app/model", line=1)      joined to  app/model#1@<hash>
+```
+
+Framed, they are distinct and reversible:
+
+```text
+["a.b",["a.b,c.d"]]           vs  ["a.b",["a.b","c.d"]]
+["app/model#1",null,"<hash>"] vs  ["app/model",1,"<hash>"]
+```
+
+`node_id` and `proof_id` keep single-delimiter joining because their prefixes
+cannot contain the delimiter — a node kind matches `[a-z][a-z0-9_]*` and a
+recommendation id and sha256 digest contain no `@`. Both are validated
+separately and both carry collision tests.
+
+## Validating a throwaway copy
+
+`npm run validate:fixtures` accepts `--root <dir>`, or `PGPROOF_CONTRACTS_ROOT`,
+pointing at a directory containing `schemas/` and `fixtures/`. Tests use it to
+validate a copy under `tmp_path` so a tracked fixture is never written during a
+test run. CI passes nothing and gets the repository paths.
 
 ## Identity encoding
 

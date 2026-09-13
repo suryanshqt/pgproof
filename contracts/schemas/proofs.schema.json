@@ -63,23 +63,6 @@
       "title": "ArmMeasurement",
       "type": "object"
     },
-    "ArtifactType": {
-      "description": "Every top-level artifact this contract version defines.",
-      "enum": [
-        "schema",
-        "code",
-        "workload",
-        "context",
-        "evidence",
-        "recommendations",
-        "scenarios",
-        "graph",
-        "stages",
-        "proofs"
-      ],
-      "title": "ArtifactType",
-      "type": "string"
-    },
     "ExperimentArm": {
       "enum": [
         "control_a1",
@@ -257,7 +240,9 @@
   "description": "Transport envelope for the pgproof proofs artifact, contract schema version 1.0.",
   "properties": {
     "artifact_type": {
-      "$ref": "#/$defs/ArtifactType"
+      "const": "proofs",
+      "title": "Artifact Type",
+      "type": "string"
     },
     "created_at": {
       "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",

@@ -9,7 +9,7 @@ is BE-04.
 
 from __future__ import annotations
 
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from pgproof.domain.envelope import ArtifactType, Envelope
 from pgproof.domain.evidence import EvidenceGraph
@@ -38,20 +38,63 @@ ARTIFACT_MODELS: Final[dict[ArtifactType, type[Contract]]] = {
     ArtifactType.PROOFS: ProofSummarySet,
 }
 
-# Parametrised eagerly rather than subscripted at call time, so every concrete
-# envelope type resolves statically. A test asserts this agrees with
-# ARTIFACT_MODELS, which is what stops the two tables drifting apart.
+
+# One concrete envelope per artifact kind, each narrowing `artifact_type` to a
+# single literal. That makes every generated schema strictly discriminated: a
+# `code` document cannot validate against the `schema` contract, in Python or in
+# an independent validator. Written out rather than built dynamically so each
+# type resolves statically; a test asserts this agrees with ARTIFACT_MODELS.
+class SchemaEnvelope(Envelope[SchemaIR]):
+    artifact_type: Literal[ArtifactType.SCHEMA]
+
+
+class CodeEnvelope(Envelope[CodeIR]):
+    artifact_type: Literal[ArtifactType.CODE]
+
+
+class WorkloadEnvelope(Envelope[WorkloadIR]):
+    artifact_type: Literal[ArtifactType.WORKLOAD]
+
+
+class ContextEnvelope(Envelope[ContextIR]):
+    artifact_type: Literal[ArtifactType.CONTEXT]
+
+
+class EvidenceEnvelope(Envelope[EvidenceGraph]):
+    artifact_type: Literal[ArtifactType.EVIDENCE]
+
+
+class RecommendationsEnvelope(Envelope[RecommendationSet]):
+    artifact_type: Literal[ArtifactType.RECOMMENDATIONS]
+
+
+class ScenariosEnvelope(Envelope[ScenarioSet]):
+    artifact_type: Literal[ArtifactType.SCENARIOS]
+
+
+class GraphEnvelope(Envelope[GraphIR]):
+    artifact_type: Literal[ArtifactType.GRAPH]
+
+
+class StagesEnvelope(Envelope[StageSet]):
+    artifact_type: Literal[ArtifactType.STAGES]
+
+
+class ProofsEnvelope(Envelope[ProofSummarySet]):
+    artifact_type: Literal[ArtifactType.PROOFS]
+
+
 ENVELOPE_MODELS: Final[dict[ArtifactType, type[Envelope[Any]]]] = {
-    ArtifactType.SCHEMA: Envelope[SchemaIR],
-    ArtifactType.CODE: Envelope[CodeIR],
-    ArtifactType.WORKLOAD: Envelope[WorkloadIR],
-    ArtifactType.CONTEXT: Envelope[ContextIR],
-    ArtifactType.EVIDENCE: Envelope[EvidenceGraph],
-    ArtifactType.RECOMMENDATIONS: Envelope[RecommendationSet],
-    ArtifactType.SCENARIOS: Envelope[ScenarioSet],
-    ArtifactType.GRAPH: Envelope[GraphIR],
-    ArtifactType.STAGES: Envelope[StageSet],
-    ArtifactType.PROOFS: Envelope[ProofSummarySet],
+    ArtifactType.SCHEMA: SchemaEnvelope,
+    ArtifactType.CODE: CodeEnvelope,
+    ArtifactType.WORKLOAD: WorkloadEnvelope,
+    ArtifactType.CONTEXT: ContextEnvelope,
+    ArtifactType.EVIDENCE: EvidenceEnvelope,
+    ArtifactType.RECOMMENDATIONS: RecommendationsEnvelope,
+    ArtifactType.SCENARIOS: ScenariosEnvelope,
+    ArtifactType.GRAPH: GraphEnvelope,
+    ArtifactType.STAGES: StagesEnvelope,
+    ArtifactType.PROOFS: ProofsEnvelope,
 }
 
 # The registry is the single source of truth for what a top-level artifact is,

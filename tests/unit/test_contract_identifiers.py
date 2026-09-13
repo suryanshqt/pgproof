@@ -18,11 +18,13 @@ from pgproof.domain.identifiers import (
     column_names,
     decode_identity,
     encode_identity,
+    frame_components,
     node_id,
     node_parts,
     proof_id,
     table_id,
     table_names,
+    unframe_components,
 )
 from pgproof.domain.primitives import Contract
 from pgproof.domain.recommendations import (
@@ -188,9 +190,9 @@ def test_node_identity_splits_on_the_first_colon_only() -> None:
     assert node_parts(node) == ("query", "sha256:" + "a" * 64)
 
 
-@pytest.mark.parametrize("kind", ["Table", "1table", "", "table kind"])
+@pytest.mark.parametrize("kind", ["Table", "1table", "", "table kind", "table:x", "ta-ble"])
 def test_malformed_node_kinds_are_rejected(kind: str) -> None:
-    with pytest.raises(ValueError, match="not a node id"):
+    with pytest.raises(ValueError, match="not a node kind"):
         node_id(kind, "public.orders")
 
 
@@ -201,7 +203,7 @@ def test_node_identity_needs_a_key() -> None:
 
 def test_source_identity_is_content_hash_backed_and_relative() -> None:
     ref = SourceRef(path="app/models.py", line=31, content_hash=DIGEST)
-    assert ref.identity == f"app/models.py#31@{DIGEST}"
+    assert unframe_components(ref.identity) == ["app/models.py", 31, DIGEST]
     with pytest.raises(ValidationError, match="repository-relative"):
         SourceRef(path="/abs/app/models.py", line=31, content_hash=DIGEST)
 
@@ -222,7 +224,7 @@ def test_proof_identity_is_recommendation_plus_input_manifest_hash() -> None:
 
 def test_node_identity_is_kind_plus_domain_identity() -> None:
     assert node_id("table", "public.orders") == "table:public.orders"
-    with pytest.raises(ValueError, match="not a node id"):
+    with pytest.raises(ValueError, match="not a node kind"):
         node_id("Table", "public.orders")
 
 
@@ -230,7 +232,8 @@ def test_recommendation_identity_ignores_object_order_and_duplicates() -> None:
     rule = "schema_integrity.orm_relationship_without_physical_fk"
     first = canonical_recommendation_identity(rule, ("b.c.d", "a.b.c"))
     second = canonical_recommendation_identity(rule, ("a.b.c", "b.c.d", "a.b.c"))
-    assert first == second == f"{rule}(a.b.c,b.c.d)"
+    assert first == second
+    assert unframe_components(first) == [rule, ["a.b.c", "b.c.d"]]
 
 
 def test_recommendation_identity_requires_a_rule_and_an_object() -> None:
@@ -266,3 +269,130 @@ def test_no_identity_bearing_model_carries_wall_clock_time() -> None:
     for model in (SourceRef, Recommendation):
         for name, field in model.model_fields.items():
             assert field.annotation not in {dt.datetime, dt.date}, f"{model.__name__}.{name}"
+
+
+# --------------------------------------------------------------------------- #
+# Composite identity framing: every builder audited for delimiter collisions
+# --------------------------------------------------------------------------- #
+def test_reported_recommendation_identity_collision_is_fixed() -> None:
+    """The exact case from review: two different object sets joined to one string."""
+    one = (column_id(table_id("a", "b,c"), "d"),)
+    two = (table_id("a", "b"), table_id("c", "d"))
+    assert list(one) != list(two)
+    assert canonical_recommendation_identity("a.b", one) != canonical_recommendation_identity(
+        "a.b", two
+    )
+
+
+def test_reported_source_identity_collision_is_fixed() -> None:
+    """The exact case from review: a '#' in a path impersonated a line number."""
+    digest = "sha256:" + "a" * 64
+    left = SourceRef(path="app/model#1", content_hash=digest)
+    right = SourceRef(path="app/model", line=1, content_hash=digest)
+    assert left != right
+    assert left.identity != right.identity
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        # A comma in an object id used to merge two objects into one.
+        (("a.b,c.d",), ("a.b", "c.d")),
+        # A quote or bracket in an object id must not break out of the framing.
+        (('a."b',), ("a.b",)),
+        (("a.]b",), ("a.b",)),
+        (("a.b", "c.d"), ("a.b,c.d",)),
+    ],
+)
+def test_recommendation_identity_is_collision_free(
+    first: tuple[str, ...], second: tuple[str, ...]
+) -> None:
+    rule = "schema_integrity.example_rule"
+    assert canonical_recommendation_identity(rule, first) != canonical_recommendation_identity(
+        rule, second
+    )
+
+
+def test_recommendation_identity_cannot_confuse_the_rule_with_an_object() -> None:
+    """The objects are framed as their own list, so the split point is fixed."""
+    left = canonical_recommendation_identity("a.b", ("c.d",))
+    right = canonical_recommendation_identity("a.b", ("a.b", "c.d"))
+    assert left != right
+    assert unframe_components(left) == ["a.b", ["c.d"]]
+
+
+def test_recommendation_identity_still_normalises_order_and_duplicates() -> None:
+    rule = "schema_integrity.example_rule"
+    assert canonical_recommendation_identity(rule, ("b.c", "a.b")) == (
+        canonical_recommendation_identity(rule, ("a.b", "b.c", "a.b"))
+    )
+
+
+@pytest.mark.parametrize(
+    ("left_kwargs", "right_kwargs"),
+    [
+        ({"path": "a#1"}, {"path": "a", "line": 1}),
+        ({"path": "a@b"}, {"path": "a", "line": None}),
+        ({"path": 'a"b'}, {"path": "ab"}),
+        ({"path": "a", "line": 12}, {"path": "a", "line": 1}),
+        ({"path": "a1"}, {"path": "a", "line": 1}),
+    ],
+)
+def test_source_identity_is_collision_free(
+    left_kwargs: dict[str, object], right_kwargs: dict[str, object]
+) -> None:
+    digest = "sha256:" + "b" * 64
+    left = SourceRef(content_hash=digest, **left_kwargs)  # type: ignore[arg-type]
+    right = SourceRef(content_hash=digest, **right_kwargs)  # type: ignore[arg-type]
+    assert left.identity != right.identity
+
+
+def test_source_identity_carries_path_nullable_line_and_hash_unambiguously() -> None:
+    digest = "sha256:" + "c" * 64
+    ref = SourceRef(path="app/models.py", line=31, content_hash=digest)
+    assert unframe_components(ref.identity) == ["app/models.py", 31, digest]
+    without_line = SourceRef(path="app/models.py", content_hash=digest)
+    assert unframe_components(without_line.identity) == ["app/models.py", None, digest]
+
+
+def test_framing_is_reversible_and_injective() -> None:
+    samples: list[tuple[object, ...]] = [
+        ("a", "b"),
+        ("a,b",),
+        ("a", None, "b"),
+        ("a", 1, "b"),
+        ('a"b', "c"),
+        ("[", "]"),
+        ("", "a"),
+    ]
+    seen: dict[str, tuple[object, ...]] = {}
+    for parts in samples:
+        framed = frame_components(*parts)
+        assert framed not in seen, f"{parts} collides with {seen.get(framed)}"
+        seen[framed] = parts
+        assert unframe_components(framed) == list(parts)
+
+
+def test_unframe_rejects_a_non_list() -> None:
+    with pytest.raises(ValueError, match="not a framed identity"):
+        unframe_components('{"a": 1}')
+
+
+def test_node_identity_cannot_collide_because_kind_excludes_the_delimiter() -> None:
+    """Audited builder: `kind` matches [a-z][a-z0-9_]*, so the first colon is the split."""
+    left = node_id("table", "a:b")
+    right = node_id("table", "a") + ":b"
+    assert left == right
+    assert node_parts(left) == ("table", "a:b")
+    with pytest.raises(ValueError, match="not a node kind"):
+        node_id("table:x", "a")
+
+
+def test_proof_identity_cannot_collide_because_both_parts_exclude_the_delimiter() -> None:
+    """Audited builder: a recommendation id and a sha256 digest contain no '@'."""
+    digest = "sha256:" + "d" * 64
+    identity = proof_id("IDX-002", digest)
+    assert identity.count("@") == 1
+    assert identity.split("@") == ["IDX-002", digest]
+    with pytest.raises(ValueError, match="not a proof id"):
+        proof_id("IDX-002@x", digest)

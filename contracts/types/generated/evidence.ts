@@ -4,20 +4,7 @@
  * Regenerate with: npm run generate
  */
 
-/**
- * Every top-level artifact this contract version defines.
- */
-export type ArtifactType =
-  | "schema"
-  | "code"
-  | "workload"
-  | "context"
-  | "evidence"
-  | "recommendations"
-  | "scenarios"
-  | "graph"
-  | "stages"
-  | "proofs";
+export type ArtifactType = "evidence";
 /**
  * RFC 3339 timestamp in UTC, ending in 'Z'.
  */

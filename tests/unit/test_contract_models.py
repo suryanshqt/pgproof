@@ -500,3 +500,110 @@ def test_pydantic_is_bounded_below_version_three() -> None:
     assert "<3" in pydantic[0]
     installed = metadata.version("pydantic")
     assert re.match(r"^2\.", installed), f"expected Pydantic 2.x, got {installed}"
+
+
+# --------------------------------------------------------------------------- #
+# Enum versioning policy: closed semantic enums vs the artifact-kind registry
+# --------------------------------------------------------------------------- #
+# ADR 0001 rule 5. These carry product meaning and are matched exhaustively, so
+# any member change is a major contract change.
+CLOSED_SEMANTIC_ENUMS = (
+    "EvidenceKind",
+    "RecommendationPriority",
+    "RecommendationCategory",
+    "VerificationState",
+    "ProofVerdict",
+    "StageStatus",
+    "StageName",
+    "EdgeKind",
+    "NodeKind",
+    "AmplificationClass",
+    "WorkloadCoverage",
+    "ScenarioKind",
+    "TenantModel",
+    "AnswerState",
+    "AnswerSchema",
+    "ChangeKind",
+    "SchemaProvenance",
+    "ConstraintKind",
+    "LoadingStrategy",
+)
+
+
+def test_evidence_kind_stays_closed_at_exactly_four_labels() -> None:
+    """Rule 5 and ARCHITECTURE section 16 both gate this enum."""
+    assert len(EvidenceKind) == 4
+    assert {kind.value for kind in EvidenceKind} == {
+        "observed",
+        "user_confirmed",
+        "inferred",
+        "verified_in_fixture",
+    }
+
+
+def test_the_closed_semantic_enums_all_exist_and_reject_unknown_values() -> None:
+    import importlib
+    import pkgutil
+    from enum import Enum
+
+    import pgproof.domain as package
+
+    found: dict[str, type[Enum]] = {}
+    for info in pkgutil.walk_packages(package.__path__, f"{package.__name__}."):
+        module = importlib.import_module(info.name)
+        for name in dir(module):
+            value = getattr(module, name)
+            if isinstance(value, type) and issubclass(value, Enum) and value is not Enum:
+                found[value.__name__] = value
+    missing = [name for name in CLOSED_SEMANTIC_ENUMS if name not in found]
+    assert missing == [], f"ADR 0001 rule 5 names enums that do not exist: {missing}"
+    for name in CLOSED_SEMANTIC_ENUMS:
+        with pytest.raises(ValueError, match="is not a valid"):
+            found[name]("a_value_no_release_ever_defined")
+
+
+def test_artifact_type_is_the_additive_registry_not_a_semantic_enum() -> None:
+    """Rule 6: a new artifact kind may land as a minor, so it is listed separately."""
+    assert "ArtifactType" not in CLOSED_SEMANTIC_ENUMS
+    # The kinds the roadmap still has to add. Their absence is exactly why rule 6
+    # exists: a blanket major-only rule would have forced a bump to finish BE-04,
+    # BE-14 and BE-33. None of them is implemented here.
+    planned_later = {"project", "migration_plan", "decisions"}
+    assert planned_later & {item.value for item in ArtifactType} == set()
+
+
+def test_an_unknown_artifact_kind_is_rejected_by_name() -> None:
+    """An older reader refuses a kind it does not know, and says which it knows."""
+    document = envelope(ArtifactType.SCHEMA, {"provenance": "physical_catalog"})
+    document["artifact_type"] = "project"
+    with pytest.raises(ValueError, match="unknown artifact_type 'project'") as raised:
+        parse_artifact(document)
+    for known in ArtifactType:
+        assert known.value in str(raised.value)
+
+
+def test_every_known_artifact_kind_still_parses_alongside_an_unknown_one() -> None:
+    """Rule 6 is only additive if an unknown kind does not disturb known ones."""
+    unknown = envelope(ArtifactType.EVIDENCE, {"refs": []})
+    unknown["artifact_type"] = "not_yet_invented"
+    with pytest.raises(ValueError, match="unknown artifact_type"):
+        parse_artifact(unknown)
+    for artifact_type, payload in (
+        (ArtifactType.EVIDENCE, {"refs": []}),
+        (ArtifactType.SCHEMA, {"provenance": "physical_catalog"}),
+        (ArtifactType.GRAPH, {"view": "current"}),
+    ):
+        assert parse_artifact(envelope(artifact_type, payload)).artifact_type is artifact_type
+
+
+@pytest.mark.parametrize("artifact_type", list(ArtifactType), ids=lambda t: t.value)
+def test_each_envelope_is_strictly_discriminated(artifact_type: ArtifactType) -> None:
+    """A document of one kind cannot be read through another kind's contract."""
+    model = envelope_model_for(artifact_type)
+    assert model.model_fields["artifact_type"].is_required()
+    for other in ArtifactType:
+        if other is artifact_type:
+            continue
+        document = envelope(other, {"refs": []})
+        with pytest.raises(ValidationError):
+            model.model_validate(document)

@@ -7,7 +7,7 @@ be detected later, per `docs/TECHNICAL_DESIGN.md` section 5.
 
 from __future__ import annotations
 
-from pgproof.domain.identifiers import MigrationId
+from pgproof.domain.identifiers import MigrationId, frame_components
 from pgproof.domain.primitives import (
     Contract,
     LineNumber,
@@ -28,9 +28,13 @@ class SourceRef(Contract):
 
     @property
     def identity(self) -> str:
-        """Content-hash-backed identity. Absolute paths cannot appear by construction."""
-        line = "" if self.line is None else f"#{self.line}"
-        return f"{self.path}{line}@{self.content_hash}"
+        """Content-hash-backed identity over path, nullable line and content hash.
+
+        Framed rather than concatenated: `path="app/model#1", line=None` and
+        `path="app/model", line=1` both produced `app/model#1@<hash>` under
+        delimiter joining, which made two different locations one identity.
+        """
+        return frame_components(self.path, self.line, self.content_hash)
 
 
 class MigrationRef(Contract):

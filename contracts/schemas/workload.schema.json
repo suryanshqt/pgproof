@@ -65,23 +65,6 @@
       "title": "AmplificationIR",
       "type": "object"
     },
-    "ArtifactType": {
-      "description": "Every top-level artifact this contract version defines.",
-      "enum": [
-        "schema",
-        "code",
-        "workload",
-        "context",
-        "evidence",
-        "recommendations",
-        "scenarios",
-        "graph",
-        "stages",
-        "proofs"
-      ],
-      "title": "ArtifactType",
-      "type": "string"
-    },
     "OperationIR": {
       "description": "An application operation, identified by adapter kind plus test identity.",
       "properties": {
@@ -441,7 +424,9 @@
   "description": "Transport envelope for the pgproof workload artifact, contract schema version 1.0.",
   "properties": {
     "artifact_type": {
-      "$ref": "#/$defs/ArtifactType"
+      "const": "workload",
+      "title": "Artifact Type",
+      "type": "string"
     },
     "created_at": {
       "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",

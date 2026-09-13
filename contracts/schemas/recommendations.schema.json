@@ -56,23 +56,6 @@
       "title": "AnswerSchema",
       "type": "string"
     },
-    "ArtifactType": {
-      "description": "Every top-level artifact this contract version defines.",
-      "enum": [
-        "schema",
-        "code",
-        "workload",
-        "context",
-        "evidence",
-        "recommendations",
-        "scenarios",
-        "graph",
-        "stages",
-        "proofs"
-      ],
-      "title": "ArtifactType",
-      "type": "string"
-    },
     "Assumption": {
       "description": "A named assumption, with what would falsify it.",
       "properties": {
@@ -559,7 +542,9 @@
   "description": "Transport envelope for the pgproof recommendations artifact, contract schema version 1.0.",
   "properties": {
     "artifact_type": {
-      "$ref": "#/$defs/ArtifactType"
+      "const": "recommendations",
+      "title": "Artifact Type",
+      "type": "string"
     },
     "created_at": {
       "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",

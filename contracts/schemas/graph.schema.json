@@ -1,22 +1,5 @@
 {
   "$defs": {
-    "ArtifactType": {
-      "description": "Every top-level artifact this contract version defines.",
-      "enum": [
-        "schema",
-        "code",
-        "workload",
-        "context",
-        "evidence",
-        "recommendations",
-        "scenarios",
-        "graph",
-        "stages",
-        "proofs"
-      ],
-      "title": "ArtifactType",
-      "type": "string"
-    },
     "EdgeKind": {
       "description": "A physical foreign key and an ORM-only relationship are distinct kinds.",
       "enum": [
@@ -178,7 +161,9 @@
   "description": "Transport envelope for the pgproof graph artifact, contract schema version 1.0.",
   "properties": {
     "artifact_type": {
-      "$ref": "#/$defs/ArtifactType"
+      "const": "graph",
+      "title": "Artifact Type",
+      "type": "string"
     },
     "created_at": {
       "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",

@@ -26,6 +26,7 @@ contract model has an OID field at all, which a test asserts.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Annotated, Final
 
@@ -52,6 +53,37 @@ RECOMMENDATION_ID_PATTERN: Final = r"^[A-Z][A-Z0-9]{1,15}-[0-9]{3,6}$"
 QUESTION_ID_PATTERN: Final = r"^[a-z][a-z0-9_]*$"
 OPERATION_ID_PATTERN: Final = r"^[a-z][a-z0-9_]*::[^\x00]{1,300}$"
 PROOF_ID_PATTERN: Final = r"^[A-Z][A-Z0-9]{1,15}-[0-9]{3,6}@sha256:[0-9a-f]{64}$"
+
+
+def frame_components(*components: object) -> str:
+    """Collision-free framing for a composite identity.
+
+    Delimiter-only concatenation is ambiguous as soon as a component may contain
+    the delimiter, and PostgreSQL logical names may contain anything. Two real
+    collisions came from that:
+
+        column_id(table_id("a", "b,c"), "d")  ->  "a.b,c.d"
+        table_id("a", "b"), table_id("c", "d")  ->  "a.b", "c.d"
+
+    both of which joined with "," to `a.b,c.d`. And:
+
+        SourceRef(path="app/model#1", content_hash=H)
+        SourceRef(path="app/model", line=1, content_hash=H)
+
+    both of which joined to `app/model#1@<H>`.
+
+    Canonical compact JSON is used instead: it is deterministic, reversible and
+    injective, because JSON escapes whatever a component contains.
+    """
+    return json.dumps(list(components), separators=(",", ":"), ensure_ascii=False, sort_keys=False)
+
+
+def unframe_components(value: str) -> list[object]:
+    """Recover the components of a framed identity. Inverse of `frame_components`."""
+    parsed = json.loads(value)
+    if not isinstance(parsed, list):
+        raise ValueError(f"not a framed identity: {value!r}")
+    return list(parsed)
 
 
 def encode_identity(*names: str) -> str:
@@ -179,8 +211,18 @@ def column_names(value: str) -> tuple[str, str, str]:
     return schema_name, table_name, column_name
 
 
+NODE_KIND_PATTERN: Final = r"^[a-z][a-z0-9_]*$"
+
+
 def node_id(kind: str, key: str) -> str:
-    """Graph node identity: node kind plus the domain identity it represents."""
+    """Graph node identity: node kind plus the domain identity it represents.
+
+    The kind is validated on its own, not only through the joined pattern. A kind
+    containing ':' would otherwise be accepted and then split at the wrong place,
+    so `node_id("table:x", "a")` used to yield kind `table`, key `x:a`.
+    """
+    if not re.match(NODE_KIND_PATTERN, kind):
+        raise ValueError(f"not a node kind: {kind!r}")
     if not key:
         raise ValueError("a node id needs a non-empty key")
     value = f"{kind}:{key}"
@@ -215,9 +257,12 @@ def canonical_recommendation_identity(rule: str, affected_objects: tuple[str, ..
     `docs/TECHNICAL_DESIGN.md` section 13 requires recommendation identity to
     survive a wording change while tracking the rule and its affected objects, so
     only those two inputs take part and the objects are order-normalised.
+
+    The objects are framed as their own list rather than flattened, so the rule
+    and the object set can never be confused for one another.
     """
     if not re.match(RULE_ID_PATTERN, rule):
         raise ValueError(f"not a rule id: {rule!r}")
     if not affected_objects:
         raise ValueError("a recommendation must affect at least one object")
-    return f"{rule}({','.join(sorted(set(affected_objects)))})"
+    return frame_components(rule, sorted(set(affected_objects)))

@@ -1,22 +1,5 @@
 {
   "$defs": {
-    "ArtifactType": {
-      "description": "Every top-level artifact this contract version defines.",
-      "enum": [
-        "schema",
-        "code",
-        "workload",
-        "context",
-        "evidence",
-        "recommendations",
-        "scenarios",
-        "graph",
-        "stages",
-        "proofs"
-      ],
-      "title": "ArtifactType",
-      "type": "string"
-    },
     "ColumnIR": {
       "properties": {
         "data_type": {
@@ -605,7 +588,9 @@
   "description": "Transport envelope for the pgproof schema artifact, contract schema version 1.0.",
   "properties": {
     "artifact_type": {
-      "$ref": "#/$defs/ArtifactType"
+      "const": "schema",
+      "title": "Artifact Type",
+      "type": "string"
     },
     "created_at": {
       "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",

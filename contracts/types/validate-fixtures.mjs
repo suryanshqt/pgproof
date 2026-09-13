@@ -14,9 +14,27 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const schemaDir = join(here, "..", "schemas");
-const validDir = join(here, "..", "fixtures", "valid");
-const invalidDir = join(here, "..", "fixtures", "invalid");
+
+// The contract root is overridable so a test can validate a throwaway copy of the
+// tree instead of corrupting the tracked fixtures. CI passes nothing and gets the
+// repository paths.
+function contractRoot() {
+  const flag = process.argv.indexOf("--root");
+  if (flag !== -1) {
+    const value = process.argv[flag + 1];
+    if (value === undefined || value.startsWith("--")) {
+      console.error("--root requires a directory");
+      process.exit(2);
+    }
+    return value;
+  }
+  return process.env.PGPROOF_CONTRACTS_ROOT ?? join(here, "..");
+}
+
+const root = contractRoot();
+const schemaDir = join(root, "schemas");
+const validDir = join(root, "fixtures", "valid");
+const invalidDir = join(root, "fixtures", "invalid");
 
 // Cases JSON Schema cannot express. Graph edge integrity and cross-artifact
 // traceability are structural joins, and the measurement/state coupling is a
@@ -134,3 +152,4 @@ console.log(
   `${validated} valid fixtures validated, ${rejected} invalid fixtures rejected, ` +
     `${NOT_SCHEMA_ENFORCEABLE.size} model-only cases recorded (Ajv 2020)`,
 );
+if (root !== join(here, "..")) console.log(`root: ${root}`);

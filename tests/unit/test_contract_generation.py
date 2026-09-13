@@ -198,21 +198,60 @@ def test_typescript_validates_every_frozen_fixture() -> None:
     assert "invalid fixtures rejected" in result.stdout
 
 
+def stage_contract_tree(destination: Path) -> Path:
+    """Copy schemas and fixtures so a test can corrupt a throwaway copy.
+
+    Tracked fixtures are never written during tests: an interrupted test would
+    otherwise leave the repository holding deliberately invalid data, and a
+    parallel test could observe it.
+    """
+    root = destination / "contracts"
+    for relative in ("schemas", "fixtures/valid", "fixtures/invalid"):
+        source = REPO / "contracts" / relative
+        target = root / relative
+        target.mkdir(parents=True, exist_ok=True)
+        for path in sorted(source.glob("*.json")):
+            (target / path.name).write_bytes(path.read_bytes())
+    return root
+
+
+def run_validator(root: Path | None = None) -> subprocess.CompletedProcess[str]:
+    command = ["npm", "run", "--silent", "validate:fixtures"]
+    if root is not None:
+        command += ["--", "--root", str(root)]
+    return subprocess.run(command, cwd=TYPES, capture_output=True, text=True, check=False)
+
+
+@npm_required
+def test_the_validator_accepts_a_staged_copy_of_the_contract_tree(tmp_path: Path) -> None:
+    root = stage_contract_tree(tmp_path)
+    result = run_validator(root)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert str(root) in result.stdout
+
+
 @npm_required
 def test_typescript_validator_detects_a_corrupted_fixture(tmp_path: Path) -> None:
-    """Proof the validator is not vacuous: corrupt a fixture and expect failure."""
-    target = REPO / "contracts" / "fixtures" / "valid" / "graph.json"
-    backup = tmp_path / "graph.json"
-    backup.write_bytes(target.read_bytes())
+    """Proof the validator is not vacuous, without touching a tracked fixture."""
+    root = stage_contract_tree(tmp_path)
+    target = root / "fixtures" / "valid" / "graph.json"
     document = json.loads(target.read_text(encoding="utf-8"))
     document["data"]["nodes"][0]["kind"] = "not_a_node_kind"
-    try:
-        target.write_text(
-            json.dumps(document, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-        result = run_npm("validate:fixtures")
-        assert result.returncode != 0
-        assert "should validate but did not" in result.stderr
-    finally:
-        target.write_bytes(backup.read_bytes())
+    target.write_text(
+        json.dumps(document, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    result = run_validator(root)
+    assert result.returncode != 0
+    assert "should validate but did not" in result.stderr
+
+
+def test_no_test_writes_to_a_tracked_fixture() -> None:
+    """The contract fixtures are committed data; tests copy before corrupting."""
+    for path in sorted((REPO / "tests").rglob("test_*.py")):
+        source = path.read_text(encoding="utf-8")
+        for line in source.splitlines():
+            if "write_text" not in line and "write_bytes" not in line:
+                continue
+            assert "REPO /" not in line, f"{path.name}: writes under the repository root"
+            assert "contracts/fixtures" not in line, f"{path.name}: writes a tracked fixture"
