@@ -58,6 +58,26 @@ DOCKER_FILENAMES: Final = frozenset(
 )
 
 
+def app_source_paths(inventory: RepositoryInventory, root: Path) -> list[Path]:
+    """`.py` files under a likely app root; `likely_app_roots` names bare packages, so both
+    a top-level `<name>/` and a `src/<name>/` layout are matched.
+
+    Shared by `pgproof inspect`'s SQLAlchemy parsing and `pgproof configure`'s
+    dynamic question skipping, so both see the same candidate file set.
+    """
+    app_roots = set(inventory.signals.likely_app_roots)
+    paths = []
+    for ref in inventory.included:
+        parts = Path(ref.path).parts
+        if not ref.path.endswith(".py") or not parts:
+            continue
+        if parts[0] in app_roots or (
+            len(parts) > 1 and parts[0] == "src" and parts[1] in app_roots
+        ):
+            paths.append(root / ref.path)
+    return sorted(paths)
+
+
 def discover(
     root: Path,
     *,

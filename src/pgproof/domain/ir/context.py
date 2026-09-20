@@ -7,11 +7,14 @@ default is never written.
 
 from __future__ import annotations
 
+import hashlib
+
 from pgproof.domain.identifiers import QuestionId, TableId
 from pgproof.domain.primitives import (
     Contract,
     DecimalString,
     NonEmptyText,
+    Sha256,
     SnakeCaseEnum,
 )
 
@@ -68,3 +71,13 @@ class ContextIR(Contract):
     rpo: NonEmptyText | None = None
     rto: NonEmptyText | None = None
     retention_constraints: tuple[NonEmptyText, ...] = ()
+
+
+def context_cache_key(context: ContextIR) -> Sha256:
+    """A content hash of the confirmed context, so a stage that declares this as
+    an input invalidates exactly when an answer actually changes — never when an
+    unrelated stage reruns. Same `sha256:`-prefixed shape as `domain.cache` and
+    `store.artifacts`, computed independently since `domain` may not import `store`.
+    """
+    digest = hashlib.sha256(context.canonical_json().encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
