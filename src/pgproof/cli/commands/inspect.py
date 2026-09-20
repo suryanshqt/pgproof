@@ -19,7 +19,7 @@ from typing import Any
 import click
 
 from pgproof.adapters.repository.alembic_static import AlembicStaticResult, parse_migrations
-from pgproof.adapters.repository.inventory import discover
+from pgproof.adapters.repository.inventory import app_source_paths, discover
 from pgproof.adapters.repository.sqlalchemy_static import SqlAlchemyStaticResult, parse_models
 from pgproof.cli.rendering.capabilities import TerminalCapabilities, detect_capabilities
 from pgproof.cli.rendering.marks import Mark
@@ -42,25 +42,8 @@ def _parse_alembic_directories(
     return results
 
 
-def _sqlalchemy_candidate_paths(inventory: RepositoryInventory, root: Path) -> list[Path]:
-    """`.py` files under a likely app root; `likely_app_roots` names bare packages, so both
-    a top-level `<name>/` and a `src/<name>/` layout are matched.
-    """
-    app_roots = set(inventory.signals.likely_app_roots)
-    paths = []
-    for ref in inventory.included:
-        parts = Path(ref.path).parts
-        if not ref.path.endswith(".py") or not parts:
-            continue
-        if parts[0] in app_roots or (
-            len(parts) > 1 and parts[0] == "src" and parts[1] in app_roots
-        ):
-            paths.append(root / ref.path)
-    return sorted(paths)
-
-
 def _parse_sqlalchemy_models(inventory: RepositoryInventory, root: Path) -> SqlAlchemyStaticResult:
-    return parse_models(_sqlalchemy_candidate_paths(inventory, root), root=root)
+    return parse_models(app_source_paths(inventory, root), root=root)
 
 
 def _sqlalchemy_result_to_json(result: SqlAlchemyStaticResult) -> dict[str, Any]:
