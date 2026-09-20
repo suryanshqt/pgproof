@@ -208,7 +208,12 @@ def _reconcile_tables(builder: _Builder, physical: SchemaIR, orm_schema: SchemaI
             )
 
 
-def _foreign_key_pairs(schema: SchemaIR) -> dict[tuple[str, str], ConstraintIR]:
+def foreign_key_pairs(schema: SchemaIR) -> dict[tuple[str, str], ConstraintIR]:
+    """One foreign key constraint per `(table, referenced_table)` pair.
+
+    Shared with `pgproof.adapters.diagrams.graph_ir` so graph building uses the
+    identical matching this module reconciles with, rather than a second copy.
+    """
     pairs: dict[tuple[str, str], ConstraintIR] = {}
     for constraint in schema.constraints:
         if (
@@ -219,7 +224,13 @@ def _foreign_key_pairs(schema: SchemaIR) -> dict[tuple[str, str], ConstraintIR]:
     return pairs
 
 
-def _fk_holding_relationships(code: CodeIR) -> dict[tuple[str, str], RelationshipIR]:
+def fk_holding_relationships(code: CodeIR) -> dict[tuple[str, str], RelationshipIR]:
+    """One many-to-one relationship per `(source_table, target_table)` pair.
+
+    Scoped to `MANY_TO_ONE` only: `uselist=False` marks a one-to-one pair without
+    saying which side holds the physical foreign key, so that cardinality is
+    excluded here rather than matched ambiguously.
+    """
     relationships: dict[tuple[str, str], RelationshipIR] = {}
     for relationship in code.relationships:
         if relationship.cardinality in _FK_HOLDING_CARDINALITIES:
@@ -230,8 +241,8 @@ def _fk_holding_relationships(code: CodeIR) -> dict[tuple[str, str], Relationshi
 
 
 def _reconcile_relationships(builder: _Builder, physical: SchemaIR, code: CodeIR) -> None:
-    foreign_keys = _foreign_key_pairs(physical)
-    relationships = _fk_holding_relationships(code)
+    foreign_keys = foreign_key_pairs(physical)
+    relationships = fk_holding_relationships(code)
     for pair, relationship in relationships.items():
         if pair not in foreign_keys:
             source_table, target_table = pair
