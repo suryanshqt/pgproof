@@ -94,6 +94,57 @@ def test_inspect_reports_unsupported_sqlalchemy_constructs_in_the_detail(tmp_pat
     assert "construct(s) not statically interpreted" in result.output
 
 
+_A_MIGRATION_CREATING = (
+    "revision = 'abc123'\n"
+    "down_revision = None\n"
+    "branch_labels = None\n"
+    "depends_on = None\n"
+    "from alembic import op\n"
+    "import sqlalchemy as sa\n"
+    "def upgrade():\n"
+    "    op.create_table({table!r}, sa.Column('id', sa.Integer(), primary_key=True))\n"
+)
+
+
+def test_inspect_reports_reconciliation_disagreements_in_the_terminal(tmp_path: Path) -> None:
+    _write(tmp_path, "myapp/__init__.py")
+    _write(tmp_path, "myapp/models.py", _A_MODEL)
+    _write(tmp_path, "migrations/env.py")
+    _write(
+        tmp_path,
+        "migrations/versions/0001_init.py",
+        _A_MIGRATION_CREATING.format(table="unrelated"),
+    )
+    result = CliRunner().invoke(main, ["--ascii", "inspect", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "Schema/code reconciliation" in result.output
+    assert "disagreement(s) found" in result.output
+
+
+def test_inspect_reports_no_disagreements_when_schemas_agree(tmp_path: Path) -> None:
+    _write(tmp_path, "myapp/__init__.py")
+    _write(tmp_path, "myapp/models.py", _A_MODEL)
+    _write(tmp_path, "migrations/env.py")
+    _write(
+        tmp_path,
+        "migrations/versions/0001_init.py",
+        _A_MIGRATION_CREATING.format(table="widgets"),
+    )
+    result = CliRunner().invoke(main, ["--ascii", "inspect", str(tmp_path)])
+    assert "no disagreements found" in result.output
+
+
+def test_inspect_skips_reconciliation_when_the_revision_graph_is_ambiguous(tmp_path: Path) -> None:
+    _write(tmp_path, "myapp/__init__.py")
+    _write(tmp_path, "myapp/models.py", _A_MODEL)
+    _write(tmp_path, "migrations/env.py")
+    _write(tmp_path, "migrations/versions/0001_root.py", _revision("root", None))
+    _write(tmp_path, "migrations/versions/0002_a.py", _revision("branch_a", "root"))
+    _write(tmp_path, "migrations/versions/0002_b.py", _revision("branch_b", "root"))
+    result = CliRunner().invoke(main, ["--ascii", "inspect", str(tmp_path)])
+    assert "Schema/code reconciliation skipped: every revision graph is ambiguous" in result.output
+
+
 def test_inspect_reports_a_capped_skip_list_by_default(tmp_path: Path) -> None:
     for index in range(8):
         _write(tmp_path, f".env.{index}", "secret")
@@ -227,6 +278,29 @@ def test_inspect_json_mode_includes_the_parsed_sqlalchemy_result(tmp_path: Path)
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert [m["class_name"] for m in payload["sqlalchemy"]["models"]] == ["Widget"]
+
+
+def test_inspect_json_mode_includes_the_reconciliation_result(tmp_path: Path) -> None:
+    _write(tmp_path, "myapp/__init__.py")
+    _write(tmp_path, "myapp/models.py", _A_MODEL)
+    _write(tmp_path, "migrations/env.py")
+    _write(
+        tmp_path,
+        "migrations/versions/0001_init.py",
+        "revision = 'abc123'\n"
+        "down_revision = None\n"
+        "branch_labels = None\n"
+        "depends_on = None\n"
+        "def upgrade():\n"
+        "    pass\n",
+    )
+    result = CliRunner().invoke(main, ["inspect", str(tmp_path), "--format", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    report = payload["reconciliation"]["migrations"]
+    assert len(report["observations"]) == 1
+    assert report["observations"][0]["kind"] == "model_references_missing_physical_object"
+    assert len(report["evidence"]) == 1
 
 
 # --------------------------------------------------------------------------- #
