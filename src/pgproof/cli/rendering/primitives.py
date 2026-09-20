@@ -69,12 +69,16 @@ def _labeled_block(
     caps: TerminalCapabilities,
     width: int,
 ) -> str:
-    lines = [f"{label:<{_LABEL_GUTTER}}{title}"]
-    indent = " " * _LABEL_GUTTER
+    padded_label = label.ljust(_LABEL_GUTTER)
+    if len(padded_label) == len(label):
+        padded_label += " "
+    lines = [f"{padded_label}{title}"]
+    gutter = len(padded_label)
+    indent = " " * gutter
     if body:
-        wrapped = textwrap.fill(body, width=max(width - _LABEL_GUTTER, 20))
+        wrapped = textwrap.fill(body, width=max(width - gutter, 20))
         lines.extend(f"{indent}{line}" for line in wrapped.splitlines())
-    source_indent = " " * (_LABEL_GUTTER - 2)
+    source_indent = " " * (gutter - 2)
     lines.extend(f"{source_indent}{glyph(Mark.EVIDENCE, caps)} {source}" for source in sources)
     return "\n".join(lines)
 
