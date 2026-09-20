@@ -62,6 +62,38 @@ def test_inspect_recommends_doctor_when_no_orm_is_found(tmp_path: Path) -> None:
     assert "pgproof doctor ." in result.output
 
 
+_A_MODEL = (
+    "from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column\n"
+    "class Base(DeclarativeBase):\n    pass\n"
+    "class Widget(Base):\n"
+    "    __tablename__ = 'widgets'\n"
+    "    id: Mapped[int] = mapped_column(primary_key=True)\n"
+)
+
+
+def test_inspect_detects_sqlalchemy_models_under_an_app_root(tmp_path: Path) -> None:
+    _write(tmp_path, "myapp/__init__.py")
+    _write(tmp_path, "myapp/models.py", _A_MODEL)
+    result = CliRunner().invoke(main, ["--ascii", "inspect", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "SQLAlchemy/SQLModel models parsed" in result.output
+    assert "1 model(s), 0 relationship(s)" in result.output
+
+
+def test_inspect_finds_sqlalchemy_models_under_a_src_layout(tmp_path: Path) -> None:
+    _write(tmp_path, "src/myapp/__init__.py")
+    _write(tmp_path, "src/myapp/models.py", _A_MODEL)
+    result = CliRunner().invoke(main, ["--ascii", "inspect", str(tmp_path)])
+    assert "SQLAlchemy/SQLModel models parsed" in result.output
+
+
+def test_inspect_reports_unsupported_sqlalchemy_constructs_in_the_detail(tmp_path: Path) -> None:
+    _write(tmp_path, "myapp/__init__.py")
+    _write(tmp_path, "myapp/models.py", _A_MODEL + "    extra = some_helper()\n")
+    result = CliRunner().invoke(main, ["--ascii", "inspect", str(tmp_path)])
+    assert "construct(s) not statically interpreted" in result.output
+
+
 def test_inspect_reports_a_capped_skip_list_by_default(tmp_path: Path) -> None:
     for index in range(8):
         _write(tmp_path, f".env.{index}", "secret")
@@ -186,6 +218,15 @@ def test_inspect_json_mode_includes_the_parsed_alembic_result(tmp_path: Path) ->
     assert [r["revision"] for r in alembic["revisions"]] == ["abc123"]
     assert alembic["graph"]["heads"] == ["abc123"]
     assert alembic["schema"]["migration_head"] == "abc123"
+
+
+def test_inspect_json_mode_includes_the_parsed_sqlalchemy_result(tmp_path: Path) -> None:
+    _write(tmp_path, "myapp/__init__.py")
+    _write(tmp_path, "myapp/models.py", _A_MODEL)
+    result = CliRunner().invoke(main, ["inspect", str(tmp_path), "--format", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert [m["class_name"] for m in payload["sqlalchemy"]["models"]] == ["Widget"]
 
 
 # --------------------------------------------------------------------------- #

@@ -15,11 +15,17 @@ graph resolves to exactly one head with no cycle and no missing predecessor.
 from __future__ import annotations
 
 import ast
-import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final, TypeGuard
 
+from pgproof.adapters.repository._ast_helpers import (
+    UNRESOLVED,
+    as_str_tuple,
+    callee_name,
+    content_hash,
+    literal,
+)
 from pgproof.domain.identifiers import column_id, table_id
 from pgproof.domain.ir.schema import (
     ColumnIR,
@@ -37,7 +43,11 @@ from pgproof.domain.sources import SourceRef
 
 DEFAULT_SCHEMA: Final = "public"
 
-_UNRESOLVED: Final = object()
+_UNRESOLVED: Final = UNRESOLVED
+_literal = literal
+_as_str_tuple = as_str_tuple
+_callee_name = callee_name
+_content_hash = content_hash
 
 _ON_ACTION: Final[dict[str, ReferentialAction]] = {
     "CASCADE": ReferentialAction.CASCADE,
@@ -73,10 +83,6 @@ class AlembicStaticResult:
     revisions: tuple[RevisionInfo, ...]
     graph: RevisionGraphReport
     schema: SchemaIR
-
-
-def _content_hash(text: str) -> str:
-    return f"sha256:{hashlib.sha256(text.encode('utf-8')).hexdigest()}"
 
 
 def parse_migrations(version_paths: list[Path], *, root: Path) -> AlembicStaticResult:
@@ -122,28 +128,6 @@ def parse_migrations(version_paths: list[Path], *, root: Path) -> AlembicStaticR
 # --------------------------------------------------------------------------- #
 # Revision metadata
 # --------------------------------------------------------------------------- #
-def _literal(node: ast.expr) -> object:
-    """A statically resolvable literal, or `_UNRESOLVED`."""
-    if isinstance(node, ast.Constant):
-        return node.value
-    if isinstance(node, (ast.List, ast.Tuple)):
-        values = [_literal(elt) for elt in node.elts]
-        if any(value is _UNRESOLVED for value in values):
-            return _UNRESOLVED
-        return tuple(values) if isinstance(node, ast.Tuple) else list(values)
-    return _UNRESOLVED
-
-
-def _as_str_tuple(value: object) -> tuple[str, ...]:
-    if value is None or value is _UNRESOLVED:
-        return ()
-    if isinstance(value, str):
-        return (value,)
-    if isinstance(value, (list, tuple)):
-        return tuple(item for item in value if isinstance(item, str))
-    return ()
-
-
 def _module_assignments(tree: ast.Module) -> dict[str, Any]:
     values: dict[str, Any] = {}
     for node in tree.body:
@@ -300,14 +284,6 @@ def _resolve_call_args(call: ast.Call) -> dict[str, Any] | None:
 
 def _is_column_call(node: ast.expr) -> TypeGuard[ast.Call]:
     return isinstance(node, ast.Call) and _callee_name(node.func) == "Column"
-
-
-def _callee_name(node: ast.expr) -> str | None:
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        return node.attr
-    return None
 
 
 def _resolve_column(call: ast.Call) -> dict[str, object] | object:

@@ -1,10 +1,10 @@
-"""`pgproof inspect`: bounded repository inventory plus static Alembic parsing.
+"""`pgproof inspect`: bounded repository inventory plus static Alembic/SQLAlchemy parsing.
 
-`docs/TECHNICAL_DESIGN.md` sections 5 and 6. SQLAlchemy model reconstruction
-and schema/code reconciliation (BE-09, BE-10) are not implemented yet, so this
-command's terminal output is deliberately thinner than the full `inspect`
-mockup in `docs/INTERFACE_DESIGN.md`: it reports what static analysis found,
-not a design, its questions, or its recommendations.
+`docs/TECHNICAL_DESIGN.md` sections 5 and 6. Schema/code reconciliation
+(BE-10) is not implemented yet, so this command's terminal output is
+deliberately thinner than the full `inspect` mockup in
+`docs/INTERFACE_DESIGN.md`: it reports what static analysis found, not a
+design, its questions, or its recommendations.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ import click
 
 from pgproof.adapters.repository.alembic_static import AlembicStaticResult, parse_migrations
 from pgproof.adapters.repository.inventory import discover
+from pgproof.adapters.repository.sqlalchemy_static import SqlAlchemyStaticResult, parse_models
 from pgproof.cli.rendering.capabilities import TerminalCapabilities, detect_capabilities
 from pgproof.cli.rendering.marks import Mark
 from pgproof.cli.rendering.primitives import next_command, stage_line, trailer_line
@@ -38,6 +39,36 @@ def _parse_alembic_directories(
         version_paths = sorted(versions_dir.glob("*.py")) if versions_dir.is_dir() else []
         results[alembic_dir] = parse_migrations(version_paths, root=root)
     return results
+
+
+def _sqlalchemy_candidate_paths(inventory: RepositoryInventory, root: Path) -> list[Path]:
+    """`.py` files under a likely app root; `likely_app_roots` names bare packages, so both
+    a top-level `<name>/` and a `src/<name>/` layout are matched.
+    """
+    app_roots = set(inventory.signals.likely_app_roots)
+    paths = []
+    for ref in inventory.included:
+        parts = Path(ref.path).parts
+        if not ref.path.endswith(".py") or not parts:
+            continue
+        if parts[0] in app_roots or (
+            len(parts) > 1 and parts[0] == "src" and parts[1] in app_roots
+        ):
+            paths.append(root / ref.path)
+    return sorted(paths)
+
+
+def _parse_sqlalchemy_models(inventory: RepositoryInventory, root: Path) -> SqlAlchemyStaticResult:
+    return parse_models(_sqlalchemy_candidate_paths(inventory, root), root=root)
+
+
+def _sqlalchemy_result_to_json(result: SqlAlchemyStaticResult) -> dict[str, Any]:
+    return {
+        "models": [model.canonical_dict() for model in result.code.models],
+        "relationships": [rel.canonical_dict() for rel in result.code.relationships],
+        "unsupported": [item.canonical_dict() for item in result.code.unsupported],
+        "schema": result.schema.canonical_dict(),
+    }
 
 
 def _alembic_result_to_json(result: AlembicStaticResult) -> dict[str, Any]:
@@ -60,6 +91,7 @@ def _alembic_result_to_json(result: AlembicStaticResult) -> dict[str, Any]:
 
 def _inventory_to_json(inventory: RepositoryInventory, root: Path) -> dict[str, Any]:
     alembic = _parse_alembic_directories(inventory, root)
+    sqlalchemy = _parse_sqlalchemy_models(inventory, root)
     return {
         "root": inventory.root,
         "gitignore_respected": inventory.gitignore_respected,
@@ -71,6 +103,7 @@ def _inventory_to_json(inventory: RepositoryInventory, root: Path) -> dict[str, 
         "alembic": {
             directory: _alembic_result_to_json(result) for directory, result in alembic.items()
         },
+        "sqlalchemy": _sqlalchemy_result_to_json(sqlalchemy),
     }
 
 
@@ -129,9 +162,26 @@ def _schema_replay_line(
     return stage_line(Mark.OK, "Static migration replay", detail=detail, caps=caps, width=width)
 
 
+def _sqlalchemy_stage_line(
+    result: SqlAlchemyStaticResult, *, caps: TerminalCapabilities, width: int
+) -> str:
+    model_count = len(result.code.models)
+    if model_count == 0:
+        return stage_line(
+            Mark.UNAVAILABLE, "No SQLAlchemy/SQLModel model classes found", caps=caps, width=width
+        )
+    detail = f"{model_count} model(s), {len(result.code.relationships)} relationship(s)"
+    if result.code.unsupported:
+        detail += f", {len(result.code.unsupported)} construct(s) not statically interpreted"
+    return stage_line(
+        Mark.OK, "SQLAlchemy/SQLModel models parsed", detail=detail, caps=caps, width=width
+    )
+
+
 def render_inventory(
     inventory: RepositoryInventory,
     alembic: dict[str, AlembicStaticResult],
+    sqlalchemy: SqlAlchemyStaticResult,
     *,
     caps: TerminalCapabilities,
     width: int,
@@ -179,11 +229,13 @@ def render_inventory(
         )
     )
     lines.append(_schema_replay_line(alembic, caps=caps, width=width))
+    if signals.uses_sqlalchemy or signals.uses_sqlmodel:
+        lines.append(_sqlalchemy_stage_line(sqlalchemy, caps=caps, width=width))
     lines.append(
         stage_line(
             Mark.UNAVAILABLE,
-            "SQLAlchemy model reconstruction and physical reconciliation not yet run",
-            detail="lands in BE-09/BE-10",
+            "Schema/code reconciliation not yet run",
+            detail="lands in BE-10",
             caps=caps,
             width=width,
         )
@@ -259,8 +311,11 @@ def inspect_(ctx: click.Context, path: Path, output_format: str, _force: bool) -
         click.echo(json.dumps(_inventory_to_json(inventory, root), sort_keys=True, indent=2))
         return
     alembic = _parse_alembic_directories(inventory, root)
+    sqlalchemy = _parse_sqlalchemy_models(inventory, root)
     obj = ctx.obj or {}
     caps = detect_capabilities(sys.stdout, force_ascii=bool(obj.get("force_ascii", False)))
     width = shutil.get_terminal_size((80, 24)).columns if caps.interactive else 80
     verbose = bool(obj.get("verbose", False))
-    click.echo(render_inventory(inventory, alembic, caps=caps, width=width, verbose=verbose))
+    click.echo(
+        render_inventory(inventory, alembic, sqlalchemy, caps=caps, width=width, verbose=verbose)
+    )
