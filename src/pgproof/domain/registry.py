@@ -19,6 +19,7 @@ from pgproof.domain.ir.code import CodeIR
 from pgproof.domain.ir.context import ContextIR
 from pgproof.domain.ir.schema import SchemaIR
 from pgproof.domain.ir.workload import WorkloadIR
+from pgproof.domain.migration_plan import MigrationPlan
 from pgproof.domain.primitives import Contract
 from pgproof.domain.recommendations import RecommendationSet
 from pgproof.domain.scenarios import ScenarioSet
@@ -36,6 +37,7 @@ ARTIFACT_MODELS: Final[dict[ArtifactType, type[Contract]]] = {
     ArtifactType.GRAPH: GraphIR,
     ArtifactType.STAGES: StageSet,
     ArtifactType.PROOFS: ProofSummarySet,
+    ArtifactType.MIGRATION_PLAN: MigrationPlan,
 }
 
 
@@ -84,6 +86,10 @@ class ProofsEnvelope(Envelope[ProofSummarySet]):
     artifact_type: Literal[ArtifactType.PROOFS]
 
 
+class MigrationPlanEnvelope(Envelope[MigrationPlan]):
+    artifact_type: Literal[ArtifactType.MIGRATION_PLAN]
+
+
 ENVELOPE_MODELS: Final[dict[ArtifactType, type[Envelope[Any]]]] = {
     ArtifactType.SCHEMA: SchemaEnvelope,
     ArtifactType.CODE: CodeEnvelope,
@@ -95,6 +101,7 @@ ENVELOPE_MODELS: Final[dict[ArtifactType, type[Envelope[Any]]]] = {
     ArtifactType.GRAPH: GraphEnvelope,
     ArtifactType.STAGES: StagesEnvelope,
     ArtifactType.PROOFS: ProofsEnvelope,
+    ArtifactType.MIGRATION_PLAN: MigrationPlanEnvelope,
 }
 
 # The registry is the single source of truth for what a top-level artifact is,

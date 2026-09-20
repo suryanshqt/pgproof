@@ -1,0 +1,40 @@
+{
+  "artifact_type": "migration_plan",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data": {
+    "steps": [
+      {
+        "application_action": null,
+        "backfill_or_validation": null,
+        "dependency_ids": [],
+        "deployment_boundary": "Safe without a maintenance window: NOT VALID acquires only a brief metadata lock.",
+        "id": "[\"TENANT-001\",0]",
+        "recommendation": "TENANT-001",
+        "rollback_note": "Drop the NOT VALID constraint; no data was altered.",
+        "scenario": "launch_minimal",
+        "schema_action": "Add fk_orders_tenant_id. Add it NOT VALID so existing rows are not checked immediately.",
+        "verification_requirement": "Confirm the constraint exists and is marked NOT VALID."
+      },
+      {
+        "application_action": null,
+        "backfill_or_validation": "Existing rows are validated in place; a violating row must be corrected first.",
+        "dependency_ids": [
+          "[\"TENANT-001\",0]"
+        ],
+        "deployment_boundary": "Run once existing data is known to satisfy the constraint.",
+        "id": "[\"TENANT-001\",1]",
+        "recommendation": "TENANT-001",
+        "rollback_note": "A failed validation leaves the constraint NOT VALID; nothing to undo.",
+        "scenario": "launch_minimal",
+        "schema_action": "Run VALIDATE CONSTRAINT to check existing rows without blocking concurrent writes.",
+        "verification_requirement": "Confirm the constraint is no longer marked NOT VALID."
+      }
+    ]
+  },
+  "inputs": {
+    "repository": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
+  "schema_version": "1.1",
+  "tool_version": "0.1.0"
+}

@@ -9,6 +9,7 @@ import type {
   ContextArtifact,
   EvidenceArtifact,
   GraphArtifact,
+  MigrationPlanArtifact,
   ProofsArtifact,
   RecommendationsArtifact,
   ScenariosArtifact,
@@ -21,6 +22,7 @@ export type CheckCodeArtifact = CodeArtifact;
 export type CheckContextArtifact = ContextArtifact;
 export type CheckEvidenceArtifact = EvidenceArtifact;
 export type CheckGraphArtifact = GraphArtifact;
+export type CheckMigrationPlanArtifact = MigrationPlanArtifact;
 export type CheckProofsArtifact = ProofsArtifact;
 export type CheckRecommendationsArtifact = RecommendationsArtifact;
 export type CheckScenariosArtifact = ScenariosArtifact;
@@ -33,6 +35,7 @@ type ArtifactUnion =
   | ContextArtifact
   | EvidenceArtifact
   | GraphArtifact
+  | MigrationPlanArtifact
   | ProofsArtifact
   | RecommendationsArtifact
   | ScenariosArtifact
@@ -45,4 +48,4 @@ export function artifactType(artifact: ArtifactUnion): string {
   return artifact.artifact_type;
 }
 
-export const EXPECTED_ARTIFACT_COUNT = 10;
+export const EXPECTED_ARTIFACT_COUNT = 11;

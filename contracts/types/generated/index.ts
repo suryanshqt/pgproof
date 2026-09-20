@@ -8,6 +8,7 @@ export type { CodeArtifact } from "./code.js";
 export type { ContextArtifact } from "./context.js";
 export type { EvidenceArtifact } from "./evidence.js";
 export type { GraphArtifact } from "./graph.js";
+export type { MigrationPlanArtifact } from "./migration_plan.js";
 export type { ProofsArtifact } from "./proofs.js";
 export type { RecommendationsArtifact } from "./recommendations.js";
 export type { ScenariosArtifact } from "./scenarios.js";
