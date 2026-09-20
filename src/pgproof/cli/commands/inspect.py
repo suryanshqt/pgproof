@@ -1,8 +1,8 @@
-"""`pgproof inspect`: bounded repository inventory plus static Alembic/SQLAlchemy parsing.
+"""`pgproof inspect`: bounded repository inventory, static Alembic/SQLAlchemy
+parsing, and schema/code reconciliation.
 
-`docs/TECHNICAL_DESIGN.md` sections 5 and 6. Schema/code reconciliation
-(BE-10) is not implemented yet, so this command's terminal output is
-deliberately thinner than the full `inspect` mockup in
+`docs/TECHNICAL_DESIGN.md` sections 5, 6 and 9. This command's terminal output
+is deliberately thinner than the full `inspect` mockup in
 `docs/INTERFACE_DESIGN.md`: it reports what static analysis found, not a
 design, its questions, or its recommendations.
 """
@@ -24,6 +24,7 @@ from pgproof.adapters.repository.sqlalchemy_static import SqlAlchemyStaticResult
 from pgproof.cli.rendering.capabilities import TerminalCapabilities, detect_capabilities
 from pgproof.cli.rendering.marks import Mark
 from pgproof.cli.rendering.primitives import next_command, stage_line, trailer_line
+from pgproof.domain.reconciliation import ReconciliationReport, reconcile
 from pgproof.ports.repository import RepositoryInventory
 
 _MAX_SKIPPED_SHOWN = 5
@@ -71,6 +72,24 @@ def _sqlalchemy_result_to_json(result: SqlAlchemyStaticResult) -> dict[str, Any]
     }
 
 
+def _reconcile_alembic_directories(
+    alembic: dict[str, AlembicStaticResult], sqlalchemy: SqlAlchemyStaticResult
+) -> dict[str, ReconciliationReport]:
+    """One reconciliation per Alembic environment with an unambiguous replayed schema."""
+    return {
+        directory: reconcile(result.schema, sqlalchemy.schema, sqlalchemy.code)
+        for directory, result in alembic.items()
+        if result.schema.migration_head is not None
+    }
+
+
+def _reconciliation_result_to_json(report: ReconciliationReport) -> dict[str, Any]:
+    return {
+        "observations": [observation.canonical_dict() for observation in report.observations],
+        "evidence": [ref.canonical_dict() for ref in report.evidence.refs],
+    }
+
+
 def _alembic_result_to_json(result: AlembicStaticResult) -> dict[str, Any]:
     return {
         "revisions": [
@@ -92,6 +111,7 @@ def _alembic_result_to_json(result: AlembicStaticResult) -> dict[str, Any]:
 def _inventory_to_json(inventory: RepositoryInventory, root: Path) -> dict[str, Any]:
     alembic = _parse_alembic_directories(inventory, root)
     sqlalchemy = _parse_sqlalchemy_models(inventory, root)
+    reconciliation = _reconcile_alembic_directories(alembic, sqlalchemy)
     return {
         "root": inventory.root,
         "gitignore_respected": inventory.gitignore_respected,
@@ -104,6 +124,10 @@ def _inventory_to_json(inventory: RepositoryInventory, root: Path) -> dict[str, 
             directory: _alembic_result_to_json(result) for directory, result in alembic.items()
         },
         "sqlalchemy": _sqlalchemy_result_to_json(sqlalchemy),
+        "reconciliation": {
+            directory: _reconciliation_result_to_json(report)
+            for directory, report in reconciliation.items()
+        },
     }
 
 
@@ -178,10 +202,59 @@ def _sqlalchemy_stage_line(
     )
 
 
+def _reconciliation_stage_line(
+    inventory: RepositoryInventory,
+    alembic: dict[str, AlembicStaticResult],
+    reconciliation: dict[str, ReconciliationReport],
+    *,
+    caps: TerminalCapabilities,
+    width: int,
+) -> str:
+    signals = inventory.signals
+    if not (signals.uses_sqlalchemy or signals.uses_sqlmodel):
+        return stage_line(
+            Mark.UNAVAILABLE,
+            "Schema/code reconciliation not run: no SQLAlchemy/SQLModel imports found",
+            caps=caps,
+            width=width,
+        )
+    if not alembic:
+        return stage_line(
+            Mark.UNAVAILABLE,
+            "Schema/code reconciliation not run: no Alembic migrations",
+            caps=caps,
+            width=width,
+        )
+    if not reconciliation:
+        return stage_line(
+            Mark.UNAVAILABLE,
+            "Schema/code reconciliation skipped: every revision graph is ambiguous",
+            caps=caps,
+            width=width,
+        )
+    total = sum(len(report.observations) for report in reconciliation.values())
+    if total == 0:
+        return stage_line(
+            Mark.OK,
+            "Schema/code reconciliation",
+            detail="no disagreements found",
+            caps=caps,
+            width=width,
+        )
+    return stage_line(
+        Mark.ATTENTION,
+        "Schema/code reconciliation",
+        detail=f"{total} disagreement(s) found",
+        caps=caps,
+        width=width,
+    )
+
+
 def render_inventory(
     inventory: RepositoryInventory,
     alembic: dict[str, AlembicStaticResult],
     sqlalchemy: SqlAlchemyStaticResult,
+    reconciliation: dict[str, ReconciliationReport],
     *,
     caps: TerminalCapabilities,
     width: int,
@@ -232,13 +305,7 @@ def render_inventory(
     if signals.uses_sqlalchemy or signals.uses_sqlmodel:
         lines.append(_sqlalchemy_stage_line(sqlalchemy, caps=caps, width=width))
     lines.append(
-        stage_line(
-            Mark.UNAVAILABLE,
-            "Schema/code reconciliation not yet run",
-            detail="lands in BE-10",
-            caps=caps,
-            width=width,
-        )
+        _reconciliation_stage_line(inventory, alembic, reconciliation, caps=caps, width=width)
     )
     lines.append("")
     lines.append(
@@ -312,10 +379,13 @@ def inspect_(ctx: click.Context, path: Path, output_format: str, _force: bool) -
         return
     alembic = _parse_alembic_directories(inventory, root)
     sqlalchemy = _parse_sqlalchemy_models(inventory, root)
+    reconciliation = _reconcile_alembic_directories(alembic, sqlalchemy)
     obj = ctx.obj or {}
     caps = detect_capabilities(sys.stdout, force_ascii=bool(obj.get("force_ascii", False)))
     width = shutil.get_terminal_size((80, 24)).columns if caps.interactive else 80
     verbose = bool(obj.get("verbose", False))
     click.echo(
-        render_inventory(inventory, alembic, sqlalchemy, caps=caps, width=width, verbose=verbose)
+        render_inventory(
+            inventory, alembic, sqlalchemy, reconciliation, caps=caps, width=width, verbose=verbose
+        )
     )
