@@ -25,9 +25,9 @@ def test_help_states_the_local_first_contract() -> None:
     assert "makes no outbound network request" in text
 
 
-def test_help_reports_that_no_analysis_commands_exist_yet() -> None:
+def test_help_reports_that_not_every_command_exists_yet() -> None:
     result = CliRunner().invoke(main, ["--help"])
-    assert "No analysis commands are implemented yet." in _normalised(result.output)
+    assert "Not every command is implemented yet." in _normalised(result.output)
 
 
 def test_bare_invocation_shows_usage_and_exits_two() -> None:
@@ -37,15 +37,22 @@ def test_bare_invocation_shows_usage_and_exits_two() -> None:
 
 
 def test_unknown_command_is_rejected() -> None:
-    result = CliRunner().invoke(main, ["inspect"])
+    result = CliRunner().invoke(main, ["review"])
     assert result.exit_code != 0
 
 
-def test_doctor_is_the_one_registered_product_command() -> None:
+def test_the_registered_product_commands_appear_in_help() -> None:
     result = CliRunner().invoke(main, ["--help"])
     assert "doctor" in result.output
+    assert "inspect" in result.output
+    assert "ui" in result.output
 
 
 def test_ascii_is_a_global_option() -> None:
     result = CliRunner().invoke(main, ["--help"])
     assert "--ascii" in result.output
+
+
+def test_verbose_is_a_global_option() -> None:
+    result = CliRunner().invoke(main, ["--help"])
+    assert "--verbose" in result.output

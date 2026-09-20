@@ -160,3 +160,8 @@ def test_next_command_uses_the_trailer_gutter() -> None:
 
 def test_trailer_line_is_reusable_for_other_labels() -> None:
     assert trailer_line("Report", ".pgproof/report/") == "Report  .pgproof/report/"
+
+
+def test_trailer_line_keeps_one_space_when_the_label_fills_the_gutter() -> None:
+    """A label as long as the gutter itself must not collide with its value."""
+    assert trailer_line("Included", "3 files") == "Included 3 files"
