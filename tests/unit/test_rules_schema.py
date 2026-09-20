@@ -1,7 +1,7 @@
 """Schema rule: an ORM relationship with no physical foreign key behind it."""
 
 from pgproof.domain.ir.code import CodeIR
-from pgproof.domain.ir.context import ContextIR
+from pgproof.domain.ir.context import ContextIR, TenantModel
 from pgproof.domain.ir.schema import SchemaIR, SchemaProvenance
 from pgproof.domain.recommendations import (
     RecommendationCategory,
@@ -13,13 +13,13 @@ from pgproof.rules.base import RuleContext
 from pgproof.rules.schema import RULE_ID, orm_relationship_without_physical_fk
 
 
-def _ctx(*observations: Observation) -> RuleContext:
+def _ctx(*observations: Observation, context: ContextIR | None = None) -> RuleContext:
     return RuleContext(
         physical=SchemaIR(provenance=SchemaProvenance.STATIC_MIGRATION),
         orm_schema=SchemaIR(provenance=SchemaProvenance.ORM_DECLARATION),
         code=CodeIR(orm="sqlalchemy"),
         reconciliation=ReconciliationReport(observations=observations),
-        context=ContextIR(),
+        context=context if context is not None else ContextIR(),
     )
 
 
@@ -89,3 +89,23 @@ def test_other_observation_kinds_are_ignored() -> None:
 def test_no_observations_produces_no_recommendations() -> None:
     result = orm_relationship_without_physical_fk(_ctx())
     assert result == RecommendationSet()
+
+
+def test_a_confirmed_single_tenant_model_overrides_the_name_heuristic() -> None:
+    context = ContextIR(tenant_model=TenantModel.SINGLE_TENANT)
+    result = orm_relationship_without_physical_fk(
+        _ctx(_observation("public.orders", "public.tenants"), context=context)
+    )
+    rec = result.recommendations[0]
+    assert rec.id == "SCHEMA-001"
+    assert rec.category is RecommendationCategory.SCHEMA
+
+
+def test_a_confirmed_multi_tenant_model_is_tenancy_even_without_a_tenant_named_table() -> None:
+    context = ContextIR(tenant_model=TenantModel.SHARED_SCHEMA_TENANT_ID)
+    result = orm_relationship_without_physical_fk(
+        _ctx(_observation("public.orders", "public.accounts"), context=context)
+    )
+    rec = result.recommendations[0]
+    assert rec.id == "TENANT-001"
+    assert rec.category is RecommendationCategory.TENANCY

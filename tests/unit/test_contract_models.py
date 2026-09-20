@@ -140,8 +140,9 @@ def test_data_model_for_matches_the_registry() -> None:
 # --------------------------------------------------------------------------- #
 # Version compatibility
 # --------------------------------------------------------------------------- #
-def test_contract_schema_version_starts_at_one_zero() -> None:
-    assert CONTRACT_SCHEMA_VERSION == "1.0"
+def test_contract_schema_version_is_the_current_minor() -> None:
+    """`migration_plan` (BE-14) landed as a minor bump per ADR 0001 rule 6."""
+    assert CONTRACT_SCHEMA_VERSION == "1.1"
     assert SUPPORTED_MAJOR == 1
 
 
@@ -566,9 +567,9 @@ def test_artifact_type_is_the_additive_registry_not_a_semantic_enum() -> None:
     """Rule 6: a new artifact kind may land as a minor, so it is listed separately."""
     assert "ArtifactType" not in CLOSED_SEMANTIC_ENUMS
     # The kinds the roadmap still has to add. Their absence is exactly why rule 6
-    # exists: a blanket major-only rule would have forced a bump to finish BE-04,
-    # BE-14 and BE-33. None of them is implemented here.
-    planned_later = {"project", "migration_plan", "decisions"}
+    # exists: a blanket major-only rule would have forced a bump to finish BE-04
+    # and BE-33. `migration_plan` (BE-14) is implemented as of this PR.
+    planned_later = {"project", "decisions"}
     assert planned_later & {item.value for item in ArtifactType} == set()
 
 

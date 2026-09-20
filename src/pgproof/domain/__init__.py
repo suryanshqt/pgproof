@@ -41,6 +41,7 @@ from pgproof.domain.ir.context import ContextAnswer, ContextIR, TenantModel
 from pgproof.domain.ir.schema import ColumnIR, ConstraintIR, IndexIR, SchemaIR, TableIR
 from pgproof.domain.ir.workload import OperationIR, QueryIR, WorkloadIR
 from pgproof.domain.manifest import ManifestEntry, RunManifest
+from pgproof.domain.migration_plan import MigrationPlan, MigrationPlanCycleError, PlanStep
 from pgproof.domain.primitives import Contract, SnakeCaseEnum
 from pgproof.domain.questions import AnswerSchema, MaterialQuestion
 from pgproof.domain.recommendations import (
@@ -106,10 +107,13 @@ __all__ = [
     "IndexIR",
     "ManifestEntry",
     "MaterialQuestion",
+    "MigrationPlan",
+    "MigrationPlanCycleError",
     "MigrationRef",
     "ModelIR",
     "NodeKind",
     "OperationIR",
+    "PlanStep",
     "ProofSummary",
     "ProofSummarySet",
     "ProofVerdict",
