@@ -25,7 +25,15 @@ classifiers = [
 ]
 # Bounded below v3: the domain models target the Pydantic v2 API, and the
 # generated JSON Schemas are produced by its schema generator.
-dependencies = ["click>=8.1.7", "pydantic>=2.9,<3"]
+dependencies = [
+  "click>=8.1.7",
+  "pydantic>=2.9,<3",
+  "fastapi>=0.115",
+  "uvicorn>=0.32",
+  "anyio<4.15",
+  # `@override` on `BaseHTTPMiddleware.dispatch`, backported below Python 3.12.
+  "typing-extensions>=4.12",
+]
 
 [project.urls]
 Homepage = "https://github.com/suryanshqt/pgproof"
@@ -48,6 +56,8 @@ dev = [
   "types-PyYAML>=6.0",
   "types-jsonschema>=4.23",
   "ruff>=0.9",
+  # Starlette's TestClient (used by FastAPI) requires httpx2; test-only.
+  "httpx2>=2.13.0",
 ]
 
 [tool.hatch.build.targets.wheel]

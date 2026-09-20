@@ -4,6 +4,7 @@ import click
 
 from pgproof import __version__
 from pgproof.cli.commands.doctor import doctor
+from pgproof.cli.commands.ui import ui
 
 
 @click.group(
@@ -31,3 +32,4 @@ def main(ctx: click.Context, force_ascii: bool) -> None:
 
 
 main.add_command(doctor)
+main.add_command(ui)
