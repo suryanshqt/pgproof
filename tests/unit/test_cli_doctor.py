@@ -84,7 +84,12 @@ def test_a_plain_directory_is_not_a_git_repository(tmp_path: Path) -> None:
 def test_isolated_execution_is_available_only_when_the_daemon_is_reachable(
     tmp_path: Path,
 ) -> None:
-    assert build_report(tmp_path, docker=_REACHABLE).isolated_execution_available is True
+    assert (
+        build_report(
+            tmp_path, docker=_REACHABLE, orphaned_containers=0
+        ).isolated_execution_available
+        is True
+    )
     assert build_report(tmp_path, docker=_CLI_ONLY).isolated_execution_available is False
     assert build_report(tmp_path, docker=_ABSENT).isolated_execution_note is not None
 
@@ -162,7 +167,7 @@ def test_doctor_non_tty_output_contains_no_ansi_escape_codes(tmp_path: Path) -> 
 # Snapshot matrix: 80/120 columns; Unicode/ASCII; color/no-color; success/partial
 # --------------------------------------------------------------------------- #
 def test_snapshot_80_columns_unicode_color_all_capabilities_available() -> None:
-    report = build_report(Path("/repo"), docker=_REACHABLE)
+    report = build_report(Path("/repo"), docker=_REACHABLE, orphaned_containers=0)
     caps = TerminalCapabilities(interactive=True, color=True, unicode=True)
     text = render_report(report, caps=caps, width=80)
     assert text.splitlines()[0].startswith("\x1b[32m✓\x1b[0m pgproof")

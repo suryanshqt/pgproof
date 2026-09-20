@@ -4,9 +4,15 @@ Isolation choices this module makes, none dictated by name in the docs but
 each required by `docs/ARCHITECTURE.md:72-74`'s "no host write mount, no
 external network, explicit resource/time limits, non-root":
 
-- The repository is bind-mounted read-only at `/src`; the runner's own shell
-  copies it into a `mode=1777` tmpfs workspace before running the command, so
-  a host write is structurally impossible rather than merely discouraged.
+- The repository is copied, on the host, into a throwaway staging directory
+  pgproof itself creates and makes world-writable; that disposable copy — not
+  the caller's real repository — is bind-mounted read-write at `/workspace`.
+  The real repository is never mounted or otherwise reachable from inside the
+  container, so a host write is structurally impossible. Staging on the host
+  also sidesteps a real portability trap: a plain read-only bind mount of the
+  original directory, read back as a fixed non-root UID, fails outright
+  whenever that directory isn't world-readable (the common case for anything
+  `tempfile`/`pytest.tmp_path` creates, mode `0700`).
 - The container always runs as a fixed non-root uid:gid.
 - `--network none` unless `RunnerConfig.network` opts in.
 - `--cpus`/`--memory`/`--pids-limit` map directly from `RunnerConfig`.
@@ -20,9 +26,9 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import re
-import shlex
 import shutil
 import subprocess
+import tempfile
 import time
 import uuid
 from collections.abc import Sequence
@@ -127,6 +133,14 @@ def remove_containers(ids: Sequence[str]) -> None:
         _docker(["rm", "-f", container_id])
 
 
+def _stage_source(source: Path, run_id: str) -> Path:
+    staging = Path(tempfile.mkdtemp(prefix=f"pgproof-runner-{run_id}-"))
+    shutil.copytree(source, staging, dirs_exist_ok=True)
+    for path in (staging, *staging.rglob("*")):
+        path.chmod(0o777)
+    return staging
+
+
 class DockerRunner:
     def run(self, spec: RunSpec) -> RunOutcome:
         if not probe_docker().daemon_reachable:
@@ -134,52 +148,52 @@ class DockerRunner:
         image = resolve_image(spec.config, spec.source)
         run_id = uuid.uuid4().hex[:12]
         memory = _normalize_memory(spec.config.memory)
-
-        create_args = [
-            "create",
-            "--name",
-            f"pgproof-runner-{run_id}",
-            "--label",
-            f"{_LABEL_OWNER}={_OWNER_VALUE}",
-            "--user",
-            _DEFAULT_USER,
-            "--network",
-            "bridge" if spec.config.network else "none",
-            "--cpus",
-            str(spec.config.cpu),
-            "--memory",
-            memory,
-            "--memory-swap",
-            memory,
-            "--pids-limit",
-            str(spec.config.pids),
-            "-v",
-            f"{spec.source}:/src:ro",
-            "--tmpfs",
-            f"{_WORKSPACE}:rw,size=512m,mode=1777",
-            "--workdir",
-            _WORKSPACE,
-        ]
-        for key, value in spec.environment.items():
-            create_args += ["-e", f"{key}={value}"]
-        shell_command = f"cp -r /src/. {_WORKSPACE}/ && {shlex.join(spec.command)}"
-        create_args += [image, "sh", "-c", shell_command]
-
-        created = _docker(create_args)
-        if created.returncode != 0:
-            return RunOutcome(
-                exit_code=None,
-                timed_out=False,
-                cancelled=False,
-                stdout="",
-                stderr=created.stderr,
-                duration_seconds=0.0,
-            )
-        container_id = created.stdout.strip()
+        staging = _stage_source(spec.source, run_id)
         try:
-            return self._run_created_container(container_id, spec)
+            create_args = [
+                "create",
+                "--name",
+                f"pgproof-runner-{run_id}",
+                "--label",
+                f"{_LABEL_OWNER}={_OWNER_VALUE}",
+                "--user",
+                _DEFAULT_USER,
+                "--network",
+                "bridge" if spec.config.network else "none",
+                "--cpus",
+                str(spec.config.cpu),
+                "--memory",
+                memory,
+                "--memory-swap",
+                memory,
+                "--pids-limit",
+                str(spec.config.pids),
+                "-v",
+                f"{staging}:{_WORKSPACE}:rw",
+                "--workdir",
+                _WORKSPACE,
+            ]
+            for key, value in spec.environment.items():
+                create_args += ["-e", f"{key}={value}"]
+            create_args += [image, *spec.command]
+
+            created = _docker(create_args)
+            if created.returncode != 0:
+                return RunOutcome(
+                    exit_code=None,
+                    timed_out=False,
+                    cancelled=False,
+                    stdout="",
+                    stderr=created.stderr,
+                    duration_seconds=0.0,
+                )
+            container_id = created.stdout.strip()
+            try:
+                return self._run_created_container(container_id, spec)
+            finally:
+                _docker(["rm", "-f", container_id])
         finally:
-            _docker(["rm", "-f", container_id])
+            shutil.rmtree(staging, ignore_errors=True)
 
     def _run_created_container(self, container_id: str, spec: RunSpec) -> RunOutcome:
         started_at = time.monotonic()

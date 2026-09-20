@@ -67,10 +67,10 @@ def test_network_is_disabled_by_default(tmp_path: Path) -> None:
 
 
 def test_the_container_cannot_mutate_the_host_source(tmp_path: Path) -> None:
+    """Writes land on the disposable staged copy; the real source is never mounted."""
     (tmp_path / "existing.txt").write_text("original", encoding="utf-8")
-    DockerRunner().run(
-        _spec(tmp_path, ["sh", "-c", "echo pwned > /src/pwned.txt 2>/dev/null || true"])
-    )
+    outcome = DockerRunner().run(_spec(tmp_path, ["sh", "-c", "echo pwned > pwned.txt"]))
+    assert outcome.exit_code == 0
     assert not (tmp_path / "pwned.txt").exists()
     assert (tmp_path / "existing.txt").read_text(encoding="utf-8") == "original"
 

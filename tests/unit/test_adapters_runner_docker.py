@@ -184,6 +184,40 @@ def _spec(
     )
 
 
+def test_run_stages_a_world_writable_copy_and_removes_it_afterward(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "readonly.txt").write_text("data", encoding="utf-8")
+    (source / "readonly.txt").chmod(0o400)
+    staged: list[Path] = []
+
+    fake = _FakeDocker(
+        {
+            "create": [_cp(stdout="container123\n")],
+            "start": [_cp()],
+            "inspect": [_cp(stdout="false\n"), _cp(stdout="0\n")],
+            "logs": [_cp()],
+            "rm": [_cp()],
+        }
+    )
+    monkeypatch.setattr(docker_module, "_docker", fake)
+    real_stage = docker_module._stage_source
+
+    def _spy_stage(src: Path, run_id: str) -> Path:
+        result = real_stage(src, run_id)
+        staged.append(result)
+        return result
+
+    monkeypatch.setattr(docker_module, "_stage_source", _spy_stage)
+    DockerRunner().run(_spec(source))
+
+    assert len(staged) == 1
+    assert not staged[0].exists()  # cleaned up after the run
+    assert source.is_dir()  # the real source is untouched
+
+
 def test_run_raises_when_the_daemon_is_unreachable(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -221,7 +255,9 @@ def test_a_successful_run_captures_logs_and_exit_code(
     assert "--network" in create_call
     assert "none" in create_call
     assert "--user" in create_call
-    assert f"{tmp_path}:/src:ro" in create_call
+    mount = create_call[create_call.index("-v") + 1]
+    assert mount.endswith(":/workspace:rw")
+    assert mount != f"{tmp_path}:/workspace:rw"  # a staged copy, never the real source
     assert "-e" in create_call
     assert "APP_ENV=test" in create_call
     assert fake.calls[-1] == ["rm", "-f", "container123"]
