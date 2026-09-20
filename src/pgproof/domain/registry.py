@@ -3,8 +3,8 @@
 Maps each `ArtifactType` to the model its `data` payload must satisfy, so a
 consumer can resolve a document without a hand-written dispatch table.
 
-Parsing here operates on already-decoded Python objects. Loading bytes from disk
-is BE-04.
+Parsing here operates on already-decoded Python objects. Loading bytes from
+disk is `pgproof.store`.
 """
 
 from __future__ import annotations

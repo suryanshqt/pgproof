@@ -19,6 +19,7 @@ _LAYERS = frozenset(
         "local_api",
         "ports",
         "rules",
+        "store",
     }
 )
 
@@ -34,6 +35,9 @@ ALLOWED_INTERNAL: dict[str, frozenset[str]] = {
     # the filesystem, which is why it is a layer of its own rather than part of
     # the pure domain.
     "contracts": frozenset({"contracts", "domain"}),
+    # The artifact store. Reads and writes `.pgproof`, so it needs domain models
+    # and the clock port, but no application service and no adapter.
+    "store": frozenset({"domain", "ports", "store"}),
     "cli": _LAYERS,
     "local_api": _LAYERS,
 }
@@ -78,6 +82,9 @@ BANNED_EXTERNAL: dict[str, frozenset[str]] = {
     "rules": _INFRASTRUCTURE | _IO_MODULES,
     "adapters": frozenset(),
     "contracts": _INFRASTRUCTURE,
+    # I/O is the point of the store, but it has no business talking to Docker,
+    # PostgreSQL or an ORM directly; adapters own those.
+    "store": _INFRASTRUCTURE,
     "cli": frozenset(),
     "local_api": frozenset(),
 }

@@ -75,6 +75,8 @@ roadmap item that owns them lands; this repository does not pre-create empty lay
 - `application` may import `domain`, `ports`, and `application`
 - `rules` may import `domain` and `rules`, and performs no I/O
 - `adapters` may import `domain`, `ports`, and `adapters`
+- `store` may import `domain`, `ports`, and `store`, and is the only layer besides
+  `contracts` that touches the filesystem outside a composition root
 - `cli` and `local_api` are composition roots and may import any layer
 
 `domain`, `ports`, `application`, and `rules` may not import infrastructure libraries

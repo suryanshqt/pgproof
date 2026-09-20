@@ -4,7 +4,8 @@ The shape is fixed by `docs/TECHNICAL_DESIGN.md` section 4. `artifact_type`
 discriminates the `data` payload, and `inputs` carries the content hashes the
 document was derived from so a stale artifact is detectable.
 
-Nothing here touches a filesystem. Reading and writing `.pgproof` is BE-04.
+Nothing here touches a filesystem. Reading and writing `.pgproof` is
+`pgproof.store`.
 """
 
 from __future__ import annotations
