@@ -140,7 +140,11 @@ def unresolved_error_block(
 
 
 def trailer_line(label: str, value: str) -> str:
-    return f"{label:<{_TRAILER_GUTTER}}{value}"
+    """Pad `label` to the trailer gutter, but never let a long label collide with `value`."""
+    padded = label.ljust(_TRAILER_GUTTER)
+    if len(padded) == len(label):
+        padded += " "
+    return f"{padded}{value}"
 
 
 def next_command(command: str) -> str:
