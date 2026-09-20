@@ -39,3 +39,13 @@ def test_bare_invocation_shows_usage_and_exits_two() -> None:
 def test_unknown_command_is_rejected() -> None:
     result = CliRunner().invoke(main, ["inspect"])
     assert result.exit_code != 0
+
+
+def test_doctor_is_the_one_registered_product_command() -> None:
+    result = CliRunner().invoke(main, ["--help"])
+    assert "doctor" in result.output
+
+
+def test_ascii_is_a_global_option() -> None:
+    result = CliRunner().invoke(main, ["--help"])
+    assert "--ascii" in result.output
