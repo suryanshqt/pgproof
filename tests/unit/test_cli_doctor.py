@@ -94,6 +94,28 @@ def test_parse_only_is_always_available_regardless_of_docker(tmp_path: Path) -> 
     assert build_report(tmp_path, docker=_ABSENT).parse_only_available is True
 
 
+def test_orphaned_containers_defaults_to_zero_when_docker_is_unavailable(tmp_path: Path) -> None:
+    """A daemon that cannot be reached is never probed for orphans."""
+    assert build_report(tmp_path, docker=_ABSENT).orphaned_containers == 0
+
+
+def test_orphaned_containers_is_probed_only_when_the_daemon_is_reachable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from pgproof.adapters.runner.docker import OrphanedContainer
+
+    monkeypatch.setattr(
+        "pgproof.cli.commands.doctor.find_orphaned_containers",
+        lambda: (OrphanedContainer(id="abc123", name="pgproof-runner-abc123"),),
+    )
+    assert build_report(tmp_path, docker=_REACHABLE).orphaned_containers == 1
+    assert build_report(tmp_path, docker=_CLI_ONLY).orphaned_containers == 0
+
+
+def test_an_explicit_orphaned_containers_count_overrides_the_probe(tmp_path: Path) -> None:
+    assert build_report(tmp_path, docker=_REACHABLE, orphaned_containers=3).orphaned_containers == 3
+
+
 # --------------------------------------------------------------------------- #
 # CLI invocation
 # --------------------------------------------------------------------------- #
@@ -172,3 +194,18 @@ def test_snapshot_repository_not_git_shows_the_unavailable_mark() -> None:
     caps = TerminalCapabilities(interactive=False, color=False, unicode=True)
     text = render_report(report, caps=caps, width=80)
     assert "○ Not a git repository" in text
+
+
+def test_orphaned_containers_are_reported_with_the_cleanup_command() -> None:
+    report = build_report(Path("/repo"), docker=_REACHABLE, orphaned_containers=2)
+    caps = TerminalCapabilities(interactive=False, color=False, unicode=True)
+    text = render_report(report, caps=caps, width=80)
+    assert "2 orphaned container(s)" in text
+    assert "pgproof clean --containers" in text
+
+
+def test_no_orphaned_containers_line_when_there_are_none() -> None:
+    report = build_report(Path("/repo"), docker=_REACHABLE, orphaned_containers=0)
+    caps = TerminalCapabilities(interactive=False, color=False, unicode=True)
+    text = render_report(report, caps=caps, width=80)
+    assert "orphaned container" not in text

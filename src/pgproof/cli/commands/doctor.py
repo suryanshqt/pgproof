@@ -4,8 +4,9 @@
 tooling... Docker availability, and which modes can run. Missing Docker does
 not block parse-only inspection." Repository framework/migration detection is
 `pgproof.adapters` territory (BE-07); this command only reports signals cheap
-enough to need no adapter: whether the path looks like a git repository, and
-whether Docker is reachable.
+enough to need no adapter: whether the path looks like a git repository,
+whether Docker is reachable, and (BE-16) whether any pgproof-owned container
+was left behind by a crashed or killed run, `docs/TECHNICAL_DESIGN.md:692`.
 """
 
 from __future__ import annotations
@@ -14,24 +15,21 @@ import dataclasses
 import json
 import platform
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
 import click
 
 from pgproof import __version__
+from pgproof.adapters.runner.docker import DockerCapability, find_orphaned_containers, probe_docker
 from pgproof.cli.rendering.capabilities import TerminalCapabilities, detect_capabilities
 from pgproof.cli.rendering.marks import Mark
 from pgproof.cli.rendering.primitives import stage_line
 
-_DOCKER_INFO_TIMEOUT_SECONDS = 3
-
-
-@dataclasses.dataclass(frozen=True)
-class DockerCapability:
-    cli_found: bool
-    daemon_reachable: bool
+__all__ = [
+    "DockerCapability",
+    "probe_docker",
+]  # re-exported: existing import site, doctor's own tests
 
 
 @dataclasses.dataclass(frozen=True)
@@ -44,26 +42,19 @@ class DoctorReport:
     parse_only_available: bool
     isolated_execution_available: bool
     isolated_execution_note: str | None
+    orphaned_containers: int
 
 
-def probe_docker() -> DockerCapability:
-    if shutil.which("docker") is None:
-        return DockerCapability(cli_found=False, daemon_reachable=False)
-    try:
-        result = subprocess.run(
-            ["docker", "info"],
-            capture_output=True,
-            timeout=_DOCKER_INFO_TIMEOUT_SECONDS,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return DockerCapability(cli_found=True, daemon_reachable=False)
-    return DockerCapability(cli_found=True, daemon_reachable=result.returncode == 0)
-
-
-def build_report(path: Path, *, docker: DockerCapability | None = None) -> DoctorReport:
+def build_report(
+    path: Path,
+    *,
+    docker: DockerCapability | None = None,
+    orphaned_containers: int | None = None,
+) -> DoctorReport:
     resolved_docker = docker if docker is not None else probe_docker()
     isolated_available = resolved_docker.daemon_reachable
+    if orphaned_containers is None:
+        orphaned_containers = len(find_orphaned_containers()) if isolated_available else 0
     return DoctorReport(
         pgproof_version=__version__,
         python_version=platform.python_version(),
@@ -73,6 +64,7 @@ def build_report(path: Path, *, docker: DockerCapability | None = None) -> Docto
         parse_only_available=True,
         isolated_execution_available=isolated_available,
         isolated_execution_note=None if isolated_available else "Docker daemon not reachable",
+        orphaned_containers=orphaned_containers,
     )
 
 
@@ -102,6 +94,18 @@ def render_report(report: DoctorReport, *, caps: TerminalCapabilities, width: in
             width=width,
         ),
         stage_line(docker_mark, docker_text, caps=caps, width=width),
+    ]
+    if report.orphaned_containers:
+        lines.append(
+            stage_line(
+                Mark.ATTENTION,
+                f"{report.orphaned_containers} orphaned container(s)",
+                detail="pgproof clean --containers",
+                caps=caps,
+                width=width,
+            )
+        )
+    lines += [
         "",
         stage_line(Mark.OK, "Parse-only inspection", detail="available", caps=caps, width=width),
         stage_line(
