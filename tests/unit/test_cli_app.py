@@ -37,7 +37,7 @@ def test_bare_invocation_shows_usage_and_exits_two() -> None:
 
 
 def test_unknown_command_is_rejected() -> None:
-    result = CliRunner().invoke(main, ["review"])
+    result = CliRunner().invoke(main, ["not-a-real-command"])
     assert result.exit_code != 0
 
 
@@ -45,6 +45,8 @@ def test_the_registered_product_commands_appear_in_help() -> None:
     result = CliRunner().invoke(main, ["--help"])
     assert "doctor" in result.output
     assert "inspect" in result.output
+    assert "configure" in result.output
+    assert "review" in result.output
     assert "ui" in result.output
 
 

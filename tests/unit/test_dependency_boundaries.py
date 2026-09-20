@@ -28,7 +28,12 @@ _LAYERS = frozenset(
 ALLOWED_INTERNAL: dict[str, frozenset[str]] = {
     "domain": frozenset({"domain"}),
     "ports": frozenset({"domain", "ports"}),
-    "application": frozenset({"application", "domain", "ports"}),
+    # `rules` added for BE-15: `application.review` orchestrates the pure rule
+    # engine (BE-10 reconciliation -> BE-13 rules -> BE-14 scenarios/plan),
+    # none of which performs I/O, so this widens no invariant `rules` itself
+    # relies on. The first change to an existing layer's allowed set since
+    # BE-01; every prior addition (`store`, BE-04) was a wholly new layer.
+    "application": frozenset({"application", "domain", "ports", "rules"}),
     "rules": frozenset({"domain", "rules"}),
     "adapters": frozenset({"adapters", "domain", "ports"}),
     # Generated contract resources. Reads packaged JSON Schemas, so it may touch
@@ -180,6 +185,7 @@ def test_violations_are_detected(module: str, source: str, expected: str) -> Non
         ("pgproof.domain.ir", "from dataclasses import dataclass\nimport pgproof.domain.evidence"),
         ("pgproof.ports.database", "from typing import Protocol\nimport pgproof.domain.ir"),
         ("pgproof.application.review", "import pgproof.ports.artifacts"),
+        ("pgproof.application.review", "import pgproof.rules"),
         ("pgproof.adapters.postgres.catalog", "import psycopg\nimport pgproof.ports.database"),
         ("pgproof.cli.app", "import click\nimport pgproof.application.review"),
         ("pgproof.local_api.server", "import fastapi\nimport pgproof.adapters.reports"),

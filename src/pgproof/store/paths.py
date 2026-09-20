@@ -3,14 +3,14 @@
 ```text
 .pgproof/
   context.json
-  analysis/{schema,code,workload,evidence,recommendations,scenarios}.json
+  analysis/{schema,code,workload,evidence,recommendations,scenarios,migration-plan}.json
   diagrams/{current,target}.graph.json
   runs/<run-id>/{manifest.json, events.ndjson, result.json}
 ```
 
-`project.json`, `decisions.json`, `analysis/migration-plan.json` and `proofs/`
-have no domain model yet (BE-04, BE-33 and BE-14 respectively per
-`docs/PR_ROADMAP.md`) and are deliberately absent here.
+`project.json`, `decisions.json` and `proofs/` have no domain model yet
+(BE-04 and BE-33 respectively per `docs/PR_ROADMAP.md`) and are deliberately
+absent here.
 
 Directories and files are created owner-only: `docs/ARCHITECTURE.md` section 7
 requires private values to be stored with restrictive permissions, and nothing
@@ -34,6 +34,7 @@ _ANALYSIS_FILENAMES: Final[dict[ArtifactType, str]] = {
     ArtifactType.EVIDENCE: "evidence.json",
     ArtifactType.RECOMMENDATIONS: "recommendations.json",
     ArtifactType.SCENARIOS: "scenarios.json",
+    ArtifactType.MIGRATION_PLAN: "migration-plan.json",
 }
 
 DiagramView = Literal["current", "target"]

@@ -30,7 +30,7 @@ from pgproof.ports.repository import RepositoryInventory
 _MAX_SKIPPED_SHOWN = 5
 
 
-def _parse_alembic_directories(
+def parse_alembic_directories(
     inventory: RepositoryInventory, root: Path
 ) -> dict[str, AlembicStaticResult]:
     """One parse per declared Alembic environment; a repository may host more than one."""
@@ -42,7 +42,7 @@ def _parse_alembic_directories(
     return results
 
 
-def _parse_sqlalchemy_models(inventory: RepositoryInventory, root: Path) -> SqlAlchemyStaticResult:
+def parse_sqlalchemy_models(inventory: RepositoryInventory, root: Path) -> SqlAlchemyStaticResult:
     return parse_models(app_source_paths(inventory, root), root=root)
 
 
@@ -55,7 +55,7 @@ def _sqlalchemy_result_to_json(result: SqlAlchemyStaticResult) -> dict[str, Any]
     }
 
 
-def _reconcile_alembic_directories(
+def reconcile_alembic_directories(
     alembic: dict[str, AlembicStaticResult], sqlalchemy: SqlAlchemyStaticResult
 ) -> dict[str, ReconciliationReport]:
     """One reconciliation per Alembic environment with an unambiguous replayed schema."""
@@ -92,9 +92,9 @@ def _alembic_result_to_json(result: AlembicStaticResult) -> dict[str, Any]:
 
 
 def _inventory_to_json(inventory: RepositoryInventory, root: Path) -> dict[str, Any]:
-    alembic = _parse_alembic_directories(inventory, root)
-    sqlalchemy = _parse_sqlalchemy_models(inventory, root)
-    reconciliation = _reconcile_alembic_directories(alembic, sqlalchemy)
+    alembic = parse_alembic_directories(inventory, root)
+    sqlalchemy = parse_sqlalchemy_models(inventory, root)
+    reconciliation = reconcile_alembic_directories(alembic, sqlalchemy)
     return {
         "root": inventory.root,
         "gitignore_respected": inventory.gitignore_respected,
@@ -360,9 +360,9 @@ def inspect_(ctx: click.Context, path: Path, output_format: str, _force: bool) -
     if output_format == "json":
         click.echo(json.dumps(_inventory_to_json(inventory, root), sort_keys=True, indent=2))
         return
-    alembic = _parse_alembic_directories(inventory, root)
-    sqlalchemy = _parse_sqlalchemy_models(inventory, root)
-    reconciliation = _reconcile_alembic_directories(alembic, sqlalchemy)
+    alembic = parse_alembic_directories(inventory, root)
+    sqlalchemy = parse_sqlalchemy_models(inventory, root)
+    reconciliation = reconcile_alembic_directories(alembic, sqlalchemy)
     obj = ctx.obj or {}
     caps = detect_capabilities(sys.stdout, force_ascii=bool(obj.get("force_ascii", False)))
     width = shutil.get_terminal_size((80, 24)).columns if caps.interactive else 80

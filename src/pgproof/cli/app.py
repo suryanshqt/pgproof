@@ -6,6 +6,7 @@ from pgproof import __version__
 from pgproof.cli.commands.configure import configure
 from pgproof.cli.commands.doctor import doctor
 from pgproof.cli.commands.inspect import inspect_
+from pgproof.cli.commands.review import review
 from pgproof.cli.commands.ui import ui
 
 
@@ -42,4 +43,5 @@ def main(ctx: click.Context, force_ascii: bool, verbose: bool) -> None:
 main.add_command(configure)
 main.add_command(doctor)
 main.add_command(inspect_)
+main.add_command(review)
 main.add_command(ui)

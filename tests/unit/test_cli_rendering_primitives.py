@@ -165,3 +165,9 @@ def test_trailer_line_is_reusable_for_other_labels() -> None:
 def test_trailer_line_keeps_one_space_when_the_label_fills_the_gutter() -> None:
     """A label as long as the gutter itself must not collide with its value."""
     assert trailer_line("Included", "3 files") == "Included 3 files"
+
+
+def test_finding_summary_keeps_one_space_when_the_category_fills_the_gutter() -> None:
+    """Same bug class as trailer_line's: a >=10-char category must not collide."""
+    text = finding_summary(category="worth eval.", title="Title", caps=_PLAIN, width=80)
+    assert text.splitlines()[0] == "worth eval. Title"
