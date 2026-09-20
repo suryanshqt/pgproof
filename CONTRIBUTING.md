@@ -83,6 +83,35 @@ roadmap item that owns them lands; this repository does not pre-create empty lay
 The check fails closed: a new top-level package under `src/pgproof/` must be given an
 explicit rule in `ALLOWED_INTERNAL` and `BANNED_EXTERNAL` before its tests pass.
 
+## Artifact contracts
+
+`src/pgproof/domain/` holds the frozen Pydantic transport and identity models.
+They are pure: no filesystem access, no adapter, and no library other than
+Pydantic and the standard library, all enforced by
+`tests/unit/test_dependency_boundaries.py`.
+
+Generated and frozen artefacts live under `contracts/`; see
+[`contracts/README.md`](contracts/README.md).
+
+| Purpose | Command |
+|---|---|
+| Regenerate the JSON Schemas | `uv run python scripts/generate_contracts.py --write` |
+| Check the schemas for drift | `uv run python scripts/generate_contracts.py --check` |
+| Install the TypeScript toolchain | `cd contracts/types && npm ci` |
+| Regenerate the TypeScript types | `cd contracts/types && npm run generate` |
+| Check the types for drift | `cd contracts/types && npm run check` |
+| Compile the generated types | `cd contracts/types && npm run compile` |
+
+Both generators are byte-stable, and CI fails on drift in either. Changing a
+model therefore requires regenerating both, which is intentional: the contract is
+reviewed, not silently regenerated.
+
+Fixtures under `contracts/fixtures/` are **committed data, not build output**. A
+model change that breaks one is meant to fail the suite. Edit them by hand.
+
+Contract versioning is governed by
+[ADR 0001](docs/adr/0001-contract-versioning.md). A major bump requires a new ADR.
+
 ## Ground-truth fixtures
 
 `fixtures/` holds the broken and clean demo repositories that the rule engine is

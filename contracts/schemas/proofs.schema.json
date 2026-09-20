@@ -1,0 +1,290 @@
+{
+  "$defs": {
+    "ArmMeasurement": {
+      "description": "One arm's statistics. Raw samples live in the proof bundle, not here.",
+      "properties": {
+        "arm": {
+          "$ref": "#/$defs/ExperimentArm"
+        },
+        "iqr_fraction": {
+          "description": "Exact decimal carried as a string.",
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "title": "Iqr Fraction",
+          "type": "string"
+        },
+        "median_us": {
+          "minimum": 0,
+          "title": "Median Us",
+          "type": "integer"
+        },
+        "plan_shape": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plan Shape"
+        },
+        "q1_us": {
+          "minimum": 0,
+          "title": "Q1 Us",
+          "type": "integer"
+        },
+        "q3_us": {
+          "minimum": 0,
+          "title": "Q3 Us",
+          "type": "integer"
+        },
+        "samples": {
+          "minimum": 1,
+          "title": "Samples",
+          "type": "integer"
+        },
+        "warmups_discarded": {
+          "minimum": 0,
+          "title": "Warmups Discarded",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "arm",
+        "samples",
+        "warmups_discarded",
+        "median_us",
+        "q1_us",
+        "q3_us",
+        "iqr_fraction"
+      ],
+      "title": "ArmMeasurement",
+      "type": "object"
+    },
+    "ExperimentArm": {
+      "enum": [
+        "control_a1",
+        "treatment_b",
+        "drift_control_a2"
+      ],
+      "title": "ExperimentArm",
+      "type": "string"
+    },
+    "ProofSummary": {
+      "description": "A measured treatment, inseparable from its fixture.",
+      "properties": {
+        "absolute_saving_us": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Absolute Saving Us"
+        },
+        "arms": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ArmMeasurement"
+          },
+          "title": "Arms",
+          "type": "array"
+        },
+        "dataset_seed": {
+          "minLength": 1,
+          "title": "Dataset Seed",
+          "type": "string"
+        },
+        "drift_fraction": {
+          "anyOf": [
+            {
+              "description": "Exact decimal carried as a string.",
+              "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Drift Fraction"
+        },
+        "fixture_scale": {
+          "minLength": 1,
+          "title": "Fixture Scale",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[A-Z][A-Z0-9]{1,15}-[0-9]{3,6}@sha256:[0-9a-f]{64}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "input_manifest_hash": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Input Manifest Hash",
+          "type": "string"
+        },
+        "postgres_version": {
+          "minLength": 1,
+          "title": "Postgres Version",
+          "type": "string"
+        },
+        "query": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Query"
+        },
+        "recommendation": {
+          "pattern": "^[A-Z][A-Z0-9]{1,15}-[0-9]{3,6}$",
+          "title": "Recommendation",
+          "type": "string"
+        },
+        "rejection_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rejection Reason"
+        },
+        "stability_note": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stability Note"
+        },
+        "treatment": {
+          "$ref": "#/$defs/TreatmentKind"
+        },
+        "verdict": {
+          "$ref": "#/$defs/ProofVerdict"
+        }
+      },
+      "required": [
+        "id",
+        "recommendation",
+        "treatment",
+        "verdict",
+        "fixture_scale",
+        "dataset_seed",
+        "postgres_version",
+        "input_manifest_hash"
+      ],
+      "title": "ProofSummary",
+      "type": "object"
+    },
+    "ProofSummarySet": {
+      "description": "Every candidate, including the rejected ones.\n\n`docs/PRODUCT_SPEC.md` section 5 treats rejected experiments as evidence of\nrigour, so they are retained rather than filtered out.",
+      "properties": {
+        "proofs": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ProofSummary"
+          },
+          "title": "Proofs",
+          "type": "array"
+        }
+      },
+      "title": "ProofSummarySet",
+      "type": "object"
+    },
+    "ProofVerdict": {
+      "enum": [
+        "verified_in_fixture",
+        "rejected",
+        "inconclusive",
+        "unsupported"
+      ],
+      "title": "ProofVerdict",
+      "type": "string"
+    },
+    "TreatmentKind": {
+      "enum": [
+        "single_column_btree",
+        "composite_btree",
+        "eager_loading",
+        "set_based_query",
+        "stored_procedure"
+      ],
+      "title": "TreatmentKind",
+      "type": "string"
+    }
+  },
+  "$id": "https://pgproof.dev/contracts/1.0/proofs.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Transport envelope for the pgproof proofs artifact, contract schema version 1.0.",
+  "properties": {
+    "artifact_type": {
+      "const": "proofs",
+      "title": "Artifact Type",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$",
+      "title": "Created At",
+      "type": "string"
+    },
+    "data": {
+      "$ref": "#/$defs/ProofSummarySet"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Inputs",
+      "type": "object"
+    },
+    "run_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "pattern": "^1\\.(0|[1-9][0-9]*)$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[.\\-+][0-9A-Za-z.\\-+]+)?$",
+      "title": "Tool Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool_version",
+    "artifact_type",
+    "created_at",
+    "run_id",
+    "data"
+  ],
+  "title": "ProofsArtifact",
+  "type": "object"
+}
