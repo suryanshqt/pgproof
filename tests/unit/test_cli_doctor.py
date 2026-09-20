@@ -84,7 +84,12 @@ def test_a_plain_directory_is_not_a_git_repository(tmp_path: Path) -> None:
 def test_isolated_execution_is_available_only_when_the_daemon_is_reachable(
     tmp_path: Path,
 ) -> None:
-    assert build_report(tmp_path, docker=_REACHABLE).isolated_execution_available is True
+    assert (
+        build_report(
+            tmp_path, docker=_REACHABLE, orphaned_containers=0
+        ).isolated_execution_available
+        is True
+    )
     assert build_report(tmp_path, docker=_CLI_ONLY).isolated_execution_available is False
     assert build_report(tmp_path, docker=_ABSENT).isolated_execution_note is not None
 
@@ -92,6 +97,28 @@ def test_isolated_execution_is_available_only_when_the_daemon_is_reachable(
 def test_parse_only_is_always_available_regardless_of_docker(tmp_path: Path) -> None:
     """`ideation/03-product-experience.md`: missing Docker never blocks parse-only inspection."""
     assert build_report(tmp_path, docker=_ABSENT).parse_only_available is True
+
+
+def test_orphaned_containers_defaults_to_zero_when_docker_is_unavailable(tmp_path: Path) -> None:
+    """A daemon that cannot be reached is never probed for orphans."""
+    assert build_report(tmp_path, docker=_ABSENT).orphaned_containers == 0
+
+
+def test_orphaned_containers_is_probed_only_when_the_daemon_is_reachable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from pgproof.adapters.runner.docker import OrphanedContainer
+
+    monkeypatch.setattr(
+        "pgproof.cli.commands.doctor.find_orphaned_containers",
+        lambda: (OrphanedContainer(id="abc123", name="pgproof-runner-abc123"),),
+    )
+    assert build_report(tmp_path, docker=_REACHABLE).orphaned_containers == 1
+    assert build_report(tmp_path, docker=_CLI_ONLY).orphaned_containers == 0
+
+
+def test_an_explicit_orphaned_containers_count_overrides_the_probe(tmp_path: Path) -> None:
+    assert build_report(tmp_path, docker=_REACHABLE, orphaned_containers=3).orphaned_containers == 3
 
 
 # --------------------------------------------------------------------------- #
@@ -140,7 +167,7 @@ def test_doctor_non_tty_output_contains_no_ansi_escape_codes(tmp_path: Path) -> 
 # Snapshot matrix: 80/120 columns; Unicode/ASCII; color/no-color; success/partial
 # --------------------------------------------------------------------------- #
 def test_snapshot_80_columns_unicode_color_all_capabilities_available() -> None:
-    report = build_report(Path("/repo"), docker=_REACHABLE)
+    report = build_report(Path("/repo"), docker=_REACHABLE, orphaned_containers=0)
     caps = TerminalCapabilities(interactive=True, color=True, unicode=True)
     text = render_report(report, caps=caps, width=80)
     assert text.splitlines()[0].startswith("\x1b[32m✓\x1b[0m pgproof")
@@ -172,3 +199,18 @@ def test_snapshot_repository_not_git_shows_the_unavailable_mark() -> None:
     caps = TerminalCapabilities(interactive=False, color=False, unicode=True)
     text = render_report(report, caps=caps, width=80)
     assert "○ Not a git repository" in text
+
+
+def test_orphaned_containers_are_reported_with_the_cleanup_command() -> None:
+    report = build_report(Path("/repo"), docker=_REACHABLE, orphaned_containers=2)
+    caps = TerminalCapabilities(interactive=False, color=False, unicode=True)
+    text = render_report(report, caps=caps, width=80)
+    assert "2 orphaned container(s)" in text
+    assert "pgproof clean --containers" in text
+
+
+def test_no_orphaned_containers_line_when_there_are_none() -> None:
+    report = build_report(Path("/repo"), docker=_REACHABLE, orphaned_containers=0)
+    caps = TerminalCapabilities(interactive=False, color=False, unicode=True)
+    text = render_report(report, caps=caps, width=80)
+    assert "orphaned container" not in text

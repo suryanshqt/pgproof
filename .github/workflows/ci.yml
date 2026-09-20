@@ -51,7 +51,30 @@ jobs:
         run: uv run python scripts/generate_contracts.py --check
 
       - name: Test with coverage
-        run: uv run pytest
+        # tests/integration needs a real Docker daemon (BE-16); macos-15 runners
+        # do not have one. That suite runs, uncapped by the coverage gate below,
+        # in the dedicated runner-integration job instead.
+        run: uv run pytest tests/unit tests/contract
+
+  runner-integration:
+    name: Runner adversarial tests (Docker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Synchronise locked dependencies
+        run: uv sync --all-groups
+
+      - name: Pull the test image
+        run: docker pull alpine:3.19
+
+      - name: Run the isolated-runner adversarial suite
+        run: uv run pytest tests/integration --no-cov -v
 
   contracts:
     name: Contract types (TypeScript)
