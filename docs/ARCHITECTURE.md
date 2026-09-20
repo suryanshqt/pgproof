@@ -139,6 +139,12 @@ pgproof/
       database.py
       runner.py
       clock.py
+    store/
+      paths.py
+      atomic.py
+      artifacts.py
+      manifest.py
+      run.py
     adapters/
       repository/
         inventory.py

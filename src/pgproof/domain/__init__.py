@@ -5,7 +5,9 @@ generated TypeScript types. This package performs no I/O and depends on no
 adapter, per the dependency rule in `docs/ARCHITECTURE.md` section 4.
 """
 
+from pgproof.domain.cache import stage_cache_key
 from pgproof.domain.envelope import ArtifactType, Envelope
+from pgproof.domain.events import StageEvent, StageEventKind
 from pgproof.domain.evidence import EvidenceGraph, EvidenceKind, EvidenceRef
 from pgproof.domain.experiments import (
     ArmMeasurement,
@@ -38,6 +40,7 @@ from pgproof.domain.ir.code import CodeIR, ModelIR, RelationshipIR
 from pgproof.domain.ir.context import ContextAnswer, ContextIR, TenantModel
 from pgproof.domain.ir.schema import ColumnIR, ConstraintIR, IndexIR, SchemaIR, TableIR
 from pgproof.domain.ir.workload import OperationIR, QueryIR, WorkloadIR
+from pgproof.domain.manifest import ManifestEntry, RunManifest
 from pgproof.domain.primitives import Contract, SnakeCaseEnum
 from pgproof.domain.questions import AnswerSchema, MaterialQuestion
 from pgproof.domain.recommendations import (
@@ -57,7 +60,14 @@ from pgproof.domain.registry import (
 )
 from pgproof.domain.scenarios import Scenario, ScenarioDiff, ScenarioKind, ScenarioSet
 from pgproof.domain.sources import MigrationRef, SourceRef
-from pgproof.domain.stages import StageName, StageSet, StageStatus, StageSummary
+from pgproof.domain.stages import (
+    ALLOWED_STAGE_TRANSITIONS,
+    StageName,
+    StageSet,
+    StageStatus,
+    StageSummary,
+    validate_stage_transition,
+)
 from pgproof.domain.versioning import (
     CONTRACT_SCHEMA_VERSION,
     SUPPORTED_MAJOR,
@@ -67,6 +77,7 @@ from pgproof.domain.versioning import (
 )
 
 __all__ = [
+    "ALLOWED_STAGE_TRANSITIONS",
     "ARTIFACT_FILENAMES",
     "ARTIFACT_MODELS",
     "CONTRACT_SCHEMA_VERSION",
@@ -93,6 +104,7 @@ __all__ = [
     "GraphStatus",
     "IncompatibleSchemaVersionError",
     "IndexIR",
+    "ManifestEntry",
     "MaterialQuestion",
     "MigrationRef",
     "ModelIR",
@@ -107,6 +119,7 @@ __all__ = [
     "RecommendationPriority",
     "RecommendationSet",
     "RelationshipIR",
+    "RunManifest",
     "Scenario",
     "ScenarioDiff",
     "ScenarioKind",
@@ -114,6 +127,8 @@ __all__ = [
     "SchemaIR",
     "SnakeCaseEnum",
     "SourceRef",
+    "StageEvent",
+    "StageEventKind",
     "StageName",
     "StageSet",
     "StageStatus",
@@ -135,6 +150,8 @@ __all__ = [
     "parse_artifact",
     "proof_id",
     "require_supported",
+    "stage_cache_key",
     "table_id",
     "table_names",
+    "validate_stage_transition",
 ]

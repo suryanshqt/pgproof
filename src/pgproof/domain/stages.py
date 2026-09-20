@@ -1,16 +1,17 @@
-"""Stage summaries.
+"""Stage summaries and the legal transitions between their statuses.
 
 The state machine is `docs/ARCHITECTURE.md` section 14. `partial` exists so a
 useful-but-bounded result is never presented as `complete`, and a stage that
 `failed` must not be treated as valid by any downstream consumer.
 
-This module describes a stage; it does not run one, and it writes nothing.
-Run manifests, NDJSON events and the artifact store belong to BE-04.
+This module describes a stage and validates a transition between two statuses;
+it does not run one and it writes nothing. The run orchestrator, NDJSON events
+and the artifact store are `pgproof.store`.
 """
 
 from __future__ import annotations
 
-from typing import Self
+from typing import Final, Self
 
 from pydantic import Field, model_validator
 
@@ -78,3 +79,24 @@ class StageSet(Contract):
     """Every stage of one run, in declared order."""
 
     stages: tuple[StageSummary, ...] = ()
+
+
+# `docs/ARCHITECTURE.md` section 14: pending -> running -> {complete, partial,
+# failed, cancelled}. Every terminal state is final; a stage that already
+# finished cannot be reopened by a later event in the same run.
+ALLOWED_STAGE_TRANSITIONS: Final[dict[StageStatus, frozenset[StageStatus]]] = {
+    StageStatus.PENDING: frozenset({StageStatus.RUNNING, StageStatus.CANCELLED}),
+    StageStatus.RUNNING: frozenset(
+        {StageStatus.COMPLETE, StageStatus.PARTIAL, StageStatus.FAILED, StageStatus.CANCELLED}
+    ),
+    StageStatus.COMPLETE: frozenset(),
+    StageStatus.PARTIAL: frozenset(),
+    StageStatus.FAILED: frozenset(),
+    StageStatus.CANCELLED: frozenset(),
+}
+
+
+def validate_stage_transition(current: StageStatus, target: StageStatus) -> None:
+    """Raise if moving a stage from `current` to `target` is not a legal edge."""
+    if target not in ALLOWED_STAGE_TRANSITIONS[current]:
+        raise ValueError(f"invalid stage transition: {current.value} -> {target.value}")
