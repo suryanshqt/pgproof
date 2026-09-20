@@ -1,9 +1,10 @@
-"""`pgproof inspect`: the bounded repository inventory, `docs/TECHNICAL_DESIGN.md` section 5.
+"""`pgproof inspect`: bounded repository inventory plus static Alembic parsing.
 
-Schema/code reconstruction (BE-08, BE-09, BE-10) is not implemented yet, so
-this command's terminal output is deliberately thinner than the full
-`inspect` mockup in `docs/INTERFACE_DESIGN.md`: it reports what the inventory
-found, not a design or its questions.
+`docs/TECHNICAL_DESIGN.md` sections 5 and 6. SQLAlchemy model reconstruction
+and schema/code reconciliation (BE-09, BE-10) are not implemented yet, so this
+command's terminal output is deliberately thinner than the full `inspect`
+mockup in `docs/INTERFACE_DESIGN.md`: it reports what static analysis found,
+not a design, its questions, or its recommendations.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from typing import Any
 
 import click
 
+from pgproof.adapters.repository.alembic_static import AlembicStaticResult, parse_migrations
 from pgproof.adapters.repository.inventory import discover
 from pgproof.cli.rendering.capabilities import TerminalCapabilities, detect_capabilities
 from pgproof.cli.rendering.marks import Mark
@@ -26,12 +28,38 @@ from pgproof.ports.repository import RepositoryInventory
 _MAX_SKIPPED_SHOWN = 5
 
 
-def _revision_count(inventory: RepositoryInventory, alembic_dir: str) -> int:
-    prefix = f"{alembic_dir}/versions/"
-    return sum(1 for ref in inventory.included if ref.path.startswith(prefix))
+def _parse_alembic_directories(
+    inventory: RepositoryInventory, root: Path
+) -> dict[str, AlembicStaticResult]:
+    """One parse per declared Alembic environment; a repository may host more than one."""
+    results: dict[str, AlembicStaticResult] = {}
+    for alembic_dir in inventory.signals.alembic_directories:
+        versions_dir = root / alembic_dir / "versions"
+        version_paths = sorted(versions_dir.glob("*.py")) if versions_dir.is_dir() else []
+        results[alembic_dir] = parse_migrations(version_paths, root=root)
+    return results
 
 
-def _inventory_to_json(inventory: RepositoryInventory) -> dict[str, Any]:
+def _alembic_result_to_json(result: AlembicStaticResult) -> dict[str, Any]:
+    return {
+        "revisions": [
+            {
+                "revision": info.revision,
+                "down_revisions": list(info.down_revisions),
+                "branch_labels": list(info.branch_labels),
+                "depends_on": list(info.depends_on),
+                "message": info.message,
+                "source": info.source.canonical_dict(),
+            }
+            for info in result.revisions
+        ],
+        "graph": dataclasses.asdict(result.graph),
+        "schema": result.schema.canonical_dict(),
+    }
+
+
+def _inventory_to_json(inventory: RepositoryInventory, root: Path) -> dict[str, Any]:
+    alembic = _parse_alembic_directories(inventory, root)
     return {
         "root": inventory.root,
         "gitignore_respected": inventory.gitignore_respected,
@@ -40,11 +68,74 @@ def _inventory_to_json(inventory: RepositoryInventory) -> dict[str, Any]:
         "included": [ref.canonical_dict() for ref in inventory.included],
         "skipped": [dataclasses.asdict(entry) for entry in inventory.skipped],
         "signals": dataclasses.asdict(inventory.signals),
+        "alembic": {
+            directory: _alembic_result_to_json(result) for directory, result in alembic.items()
+        },
     }
 
 
+def _alembic_stage_line(
+    directory: str, result: AlembicStaticResult, *, caps: TerminalCapabilities, width: int
+) -> str:
+    graph = result.graph
+    count = len(result.revisions)
+    if len(graph.heads) == 1 and not graph.cycle and not graph.missing_predecessors:
+        detail = f"{count} revision(s), head {graph.heads[0]}"
+        return stage_line(
+            Mark.OK,
+            f"Alembic migrations detected ({directory})",
+            detail=detail,
+            caps=caps,
+            width=width,
+        )
+    if graph.cycle:
+        issue = f"a revision cycle ({' -> '.join(graph.cycle)})"
+    elif graph.missing_predecessors:
+        issue = f"a missing predecessor ({', '.join(graph.missing_predecessors)})"
+    else:
+        issue = f"{len(graph.heads)} heads ({', '.join(graph.heads)})"
+    return stage_line(
+        Mark.ATTENTION,
+        f"Alembic migrations detected ({directory})",
+        detail=f"{count} revision(s), {issue}",
+        caps=caps,
+        width=width,
+    )
+
+
+def _schema_replay_line(
+    alembic: dict[str, AlembicStaticResult], *, caps: TerminalCapabilities, width: int
+) -> str:
+    if not alembic:
+        return stage_line(
+            Mark.UNAVAILABLE,
+            "Static migration replay not run: no Alembic migrations",
+            caps=caps,
+            width=width,
+        )
+    replayed = [result for result in alembic.values() if result.schema.migration_head is not None]
+    if not replayed:
+        return stage_line(
+            Mark.UNAVAILABLE,
+            "Static migration replay skipped: the revision graph is ambiguous",
+            caps=caps,
+            width=width,
+        )
+    table_count = sum(len(result.schema.tables) for result in replayed)
+    unsupported_count = sum(len(result.schema.unsupported) for result in alembic.values())
+    detail = f"{table_count} table(s) from Alembic alone"
+    if unsupported_count:
+        detail += f", {unsupported_count} construct(s) not statically interpreted"
+    return stage_line(Mark.OK, "Static migration replay", detail=detail, caps=caps, width=width)
+
+
 def render_inventory(
-    inventory: RepositoryInventory, *, caps: TerminalCapabilities, width: int, verbose: bool
+    inventory: RepositoryInventory,
+    alembic: dict[str, AlembicStaticResult],
+    *,
+    caps: TerminalCapabilities,
+    width: int,
+    verbose: bool,
 ) -> str:
     signals = inventory.signals
     lines = []
@@ -59,13 +150,8 @@ def render_inventory(
         )
 
     if signals.uses_alembic:
-        total_revisions = sum(_revision_count(inventory, d) for d in signals.alembic_directories)
-        detail = f"{total_revisions} revision file(s), not yet parsed"
-        lines.append(
-            stage_line(
-                Mark.OK, "Alembic migrations detected", detail=detail, caps=caps, width=width
-            )
-        )
+        for directory, result in alembic.items():
+            lines.append(_alembic_stage_line(directory, result, caps=caps, width=width))
     else:
         lines.append(
             stage_line(Mark.UNAVAILABLE, "No Alembic migrations found", caps=caps, width=width)
@@ -92,11 +178,12 @@ def render_inventory(
             width=width,
         )
     )
+    lines.append(_schema_replay_line(alembic, caps=caps, width=width))
     lines.append(
         stage_line(
             Mark.UNAVAILABLE,
-            "Schema/code reconstruction not yet run",
-            detail="lands in BE-08/BE-09/BE-10",
+            "SQLAlchemy model reconstruction and physical reconciliation not yet run",
+            detail="lands in BE-09/BE-10",
             caps=caps,
             width=width,
         )
@@ -166,12 +253,14 @@ def render_inventory(
 @click.pass_context
 def inspect_(ctx: click.Context, path: Path, output_format: str, _force: bool) -> None:
     """Discover PATH's files and report ORM/migration/test/Docker signals."""
-    inventory = discover(path)
+    root = path.resolve()
+    inventory = discover(root)
     if output_format == "json":
-        click.echo(json.dumps(_inventory_to_json(inventory), sort_keys=True, indent=2))
+        click.echo(json.dumps(_inventory_to_json(inventory, root), sort_keys=True, indent=2))
         return
+    alembic = _parse_alembic_directories(inventory, root)
     obj = ctx.obj or {}
     caps = detect_capabilities(sys.stdout, force_ascii=bool(obj.get("force_ascii", False)))
     width = shutil.get_terminal_size((80, 24)).columns if caps.interactive else 80
     verbose = bool(obj.get("verbose", False))
-    click.echo(render_inventory(inventory, caps=caps, width=width, verbose=verbose))
+    click.echo(render_inventory(inventory, alembic, caps=caps, width=width, verbose=verbose))

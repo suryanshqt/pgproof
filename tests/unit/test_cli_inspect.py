@@ -31,19 +31,29 @@ def test_inspect_on_an_empty_directory_shows_every_signal_as_unavailable(tmp_pat
     assert "No Alembic migrations found" in result.output
     assert "No Docker files found" in result.output
     assert "No test layout found" in result.output
-    assert "Schema/code reconstruction not yet run" in result.output
+    assert "Static migration replay not run: no Alembic migrations" in result.output
     assert "Next" in result.output
 
 
 def test_inspect_detects_sqlalchemy_and_alembic(tmp_path: Path) -> None:
     _write(tmp_path, "models.py", "import sqlalchemy\n")
     _write(tmp_path, "migrations/env.py")
-    _write(tmp_path, "migrations/versions/0001_init.py")
+    _write(
+        tmp_path,
+        "migrations/versions/0001_init.py",
+        "revision = 'abc123'\n"
+        "down_revision = None\n"
+        "branch_labels = None\n"
+        "depends_on = None\n"
+        "def upgrade():\n"
+        "    pass\n",
+    )
     result = CliRunner().invoke(main, ["--ascii", "inspect", str(tmp_path)])
     assert result.exit_code == 0
     assert "SQLAlchemy imports detected" in result.output
-    assert "Alembic migrations detected" in result.output
-    assert "1 revision file(s)" in result.output
+    assert "Alembic migrations detected (migrations)" in result.output
+    assert "1 revision(s), head abc123" in result.output
+    assert "Static migration replay" in result.output
     assert "pgproof configure ." in result.output
 
 
@@ -152,3 +162,67 @@ def test_inspect_json_mode_writes_only_the_report_to_stdout(tmp_path: Path) -> N
 def test_inspect_json_mode_never_emits_ansi_codes(tmp_path: Path) -> None:
     result = CliRunner().invoke(main, ["inspect", str(tmp_path), "--format", "json"])
     assert not _ANSI.search(result.output)
+
+
+def test_inspect_json_mode_includes_the_parsed_alembic_result(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "migrations/env.py",
+    )
+    _write(
+        tmp_path,
+        "migrations/versions/0001_init.py",
+        "revision = 'abc123'\n"
+        "down_revision = None\n"
+        "branch_labels = None\n"
+        "depends_on = None\n"
+        "def upgrade():\n"
+        "    pass\n",
+    )
+    result = CliRunner().invoke(main, ["inspect", str(tmp_path), "--format", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    alembic = payload["alembic"]["migrations"]
+    assert [r["revision"] for r in alembic["revisions"]] == ["abc123"]
+    assert alembic["graph"]["heads"] == ["abc123"]
+    assert alembic["schema"]["migration_head"] == "abc123"
+
+
+# --------------------------------------------------------------------------- #
+# Ambiguous revision graphs, rendered in the terminal
+# --------------------------------------------------------------------------- #
+def _revision(revision: str, down_revision: str | None) -> str:
+    down = "None" if down_revision is None else f"'{down_revision}'"
+    return (
+        f"revision = '{revision}'\n"
+        f"down_revision = {down}\n"
+        "branch_labels = None\n"
+        "depends_on = None\n"
+        "def upgrade():\n"
+        "    pass\n"
+    )
+
+
+def test_inspect_flags_multiple_heads_in_the_terminal(tmp_path: Path) -> None:
+    _write(tmp_path, "migrations/env.py")
+    _write(tmp_path, "migrations/versions/0001_root.py", _revision("root", None))
+    _write(tmp_path, "migrations/versions/0002_a.py", _revision("branch_a", "root"))
+    _write(tmp_path, "migrations/versions/0002_b.py", _revision("branch_b", "root"))
+    result = CliRunner().invoke(main, ["--ascii", "inspect", str(tmp_path)])
+    assert "2 heads (branch_a, branch_b)" in result.output
+    assert "Static migration replay skipped: the revision graph is ambiguous" in result.output
+
+
+def test_inspect_flags_a_missing_predecessor_in_the_terminal(tmp_path: Path) -> None:
+    _write(tmp_path, "migrations/env.py")
+    _write(tmp_path, "migrations/versions/orphan.py", _revision("orphan", "ghost"))
+    result = CliRunner().invoke(main, ["--ascii", "inspect", str(tmp_path)])
+    assert "a missing predecessor (ghost)" in result.output
+
+
+def test_inspect_flags_a_cycle_in_the_terminal(tmp_path: Path) -> None:
+    _write(tmp_path, "migrations/env.py")
+    _write(tmp_path, "migrations/versions/a.py", _revision("cycle_a", "cycle_b"))
+    _write(tmp_path, "migrations/versions/b.py", _revision("cycle_b", "cycle_a"))
+    result = CliRunner().invoke(main, ["--ascii", "inspect", str(tmp_path)])
+    assert "a revision cycle" in result.output
