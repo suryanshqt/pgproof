@@ -771,7 +771,6 @@ Release gates:
 
 Resolve in the named PR, not before:
 
-- `BE-04`: pglast compatibility and bind-style canonicalization;
 - `BE-16`: Docker image/build workflow across arm64/amd64;
 - `BE-17`: PostgreSQL catalog coverage and schema snapshot portability;
 - `BE-21`: stable raw fetch policy across psycopg modes;

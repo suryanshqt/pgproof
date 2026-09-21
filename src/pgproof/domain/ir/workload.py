@@ -71,6 +71,11 @@ class QueryIR(Contract):
     relations: tuple[TableId, ...] = ()
     parameters: tuple[ParameterDescriptor, ...] = ()
     call_sites: tuple[SourceRef, ...] = ()
+    # BE-19: set only when `statement_class` is `UNSUPPORTED` because parsing
+    # itself failed. `docs/TECHNICAL_DESIGN.md:290`: "Unsupported statements
+    # remain visible with parser errors and source occurrences" — `call_sites`
+    # already carries the occurrences; this is the error text.
+    parse_error: NonEmptyText | None = None
 
 
 class TransactionIR(Contract):
