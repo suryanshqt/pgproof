@@ -59,6 +59,7 @@ export type IsRedacted = boolean;
 export type Position = number;
 export type ValueHash = string | null;
 export type Parameters = ParameterDescriptor[];
+export type ParseError = string | null;
 /**
  * Items: Schema-qualified table identity: two logical names joined by '.', with '.' and '\' escaped by '\'.
  */
@@ -71,7 +72,7 @@ export type SchemaVersion = string;
 export type ToolVersion = string;
 
 /**
- * Transport envelope for the pgproof workload artifact, contract schema version 1.2.
+ * Transport envelope for the pgproof workload artifact, contract schema version 1.3.
  */
 export interface WorkloadArtifact {
   artifact_type: ArtifactType;
@@ -153,6 +154,7 @@ export interface QueryIR {
   id: Id1;
   normalized_sql: NormalizedSql;
   parameters?: Parameters;
+  parse_error?: ParseError;
   relations?: Relations;
   statement_class: StatementClass;
 }

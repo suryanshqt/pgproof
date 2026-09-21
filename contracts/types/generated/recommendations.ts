@@ -91,7 +91,7 @@ export type SchemaVersion = string;
 export type ToolVersion = string;
 
 /**
- * Transport envelope for the pgproof recommendations artifact, contract schema version 1.2.
+ * Transport envelope for the pgproof recommendations artifact, contract schema version 1.3.
  */
 export interface RecommendationsArtifact {
   artifact_type: ArtifactType;

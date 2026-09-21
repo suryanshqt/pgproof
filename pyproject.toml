@@ -38,6 +38,11 @@ dependencies = [
   # BE-17: the disposable-Postgres catalog adapter. Binary build avoids
   # requiring libpq-dev on every install target.
   "psycopg[binary]>=3.2",
+  # BE-19: SQL parsing/fingerprinting. pglast's major version tracks a
+  # specific PostgreSQL grammar (via libpg_query); 7.x tracks PG17, matching
+  # this project's pin everywhere else (fixtures/benchmark-corpus.yaml).
+  # 8.x tracks PG18 and is deliberately excluded.
+  "pglast>=7.18,<8",
 ]
 
 [project.urls]
@@ -145,6 +150,14 @@ enable_error_code = [
 # inside a fixture environment.
 [[tool.mypy.overrides]]
 module = ["app.*", "sqlalchemy.*"]
+ignore_missing_imports = true
+
+# BE-19: unlike pglast.parser (which ships real stubs, kept fully strict),
+# pglast.ast/visitors/stream have none — the Cython-compiled AST node
+# classes and the Visitor base class are structurally dynamic (one
+# `visit_<NodeClassName>` method per PostgreSQL AST node type).
+[[tool.mypy.overrides]]
+module = ["pglast.ast", "pglast.visitors", "pglast.stream"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
