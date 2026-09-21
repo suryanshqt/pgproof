@@ -14,7 +14,8 @@ external network, explicit resource/time limits, non-root":
   whenever that directory isn't world-readable (the common case for anything
   `tempfile`/`pytest.tmp_path` creates, mode `0700`).
 - The container always runs as a fixed non-root uid:gid.
-- `--network none` unless `RunnerConfig.network` opts in.
+- `--network none` unless `RunnerConfig.network` opts in, or `RunSpec.network`
+  names a specific pre-existing (BE-18: `--internal`) network to join instead.
 - `--cpus`/`--memory`/`--pids-limit` map directly from `RunnerConfig`.
 - Every container/network this adapter creates carries a `pgproof.owner`
   label, so `find_orphaned_containers` can find what a crashed run left
@@ -136,6 +137,33 @@ def remove_containers(ids: Sequence[str]) -> None:
         _docker(["rm", "-f", container_id])
 
 
+def create_network(name: str) -> None:
+    """An `--internal` bridge network: containers on it reach each other by
+    name, per `docs/ARCHITECTURE.md`'s "Sandbox" diagram, but the network has
+    no route out — the same no-outbound-internet guarantee `--network none`
+    gives a single container, extended across the two containers that need
+    to reach each other (BE-18: the runner and a disposable PostgreSQL).
+    """
+    _docker(["network", "create", "--internal", "--label", f"{LABEL_OWNER}={OWNER_VALUE}", name])
+
+
+def find_orphaned_networks() -> tuple[str, ...]:
+    """Not yet surfaced by `pgproof doctor`/`clean` (only orphaned containers
+    are, today) — available so a crashed BE-18 run's network can still be
+    found and removed, and so this PR's own tests can assert none leak.
+    """
+    result = _docker(
+        ["network", "ls", "--filter", f"label={LABEL_OWNER}={OWNER_VALUE}", "--format", "{{.Name}}"]
+    )
+    if result.returncode != 0:
+        return ()
+    return tuple(name for name in result.stdout.splitlines() if name.strip())
+
+
+def remove_network(name: str) -> None:
+    _docker(["network", "rm", name])
+
+
 def _stage_source(source: Path, run_id: str) -> Path:
     staging = Path(tempfile.mkdtemp(prefix=f"pgproof-runner-{run_id}-"))
     shutil.copytree(source, staging, dirs_exist_ok=True)
@@ -162,7 +190,7 @@ class DockerRunner:
                 "--user",
                 _DEFAULT_USER,
                 "--network",
-                "bridge" if spec.config.network else "none",
+                spec.network or ("bridge" if spec.config.network else "none"),
                 "--cpus",
                 str(spec.config.cpu),
                 "--memory",
@@ -175,6 +203,13 @@ class DockerRunner:
                 f"{staging}:{_WORKSPACE}:rw",
                 "--workdir",
                 _WORKSPACE,
+                # The fixed non-root uid has no passwd entry and so no home
+                # directory; without this, any tool that caches under $HOME
+                # by default (uv, pip, npm, ...) fails outright, since
+                # nothing but `/workspace` is writable. `spec.environment`,
+                # applied after, can still override it.
+                "-e",
+                f"HOME={_WORKSPACE}",
             ]
             for key, value in spec.environment.items():
                 create_args += ["-e", f"{key}={value}"]

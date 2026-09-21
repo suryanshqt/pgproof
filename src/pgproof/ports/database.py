@@ -36,6 +36,10 @@ class GeneratedCredentials:
 class DisposableDatabase:
     credentials: GeneratedCredentials
     container_id: str
+    # Set only when `start(network=...)` joined a shared Docker network: the
+    # same database, reachable by container name from another container on
+    # that network, rather than by the host-facing `credentials` above.
+    internal_credentials: GeneratedCredentials | None = None
 
 
 class DatabaseUnavailableError(RuntimeError):
@@ -43,7 +47,9 @@ class DatabaseUnavailableError(RuntimeError):
 
 
 class DatabaseLifecycle(Protocol):
-    def start(self, *, image: str, timeout_seconds: float) -> DisposableDatabase: ...
+    def start(
+        self, *, image: str, timeout_seconds: float, network: str | None = None
+    ) -> DisposableDatabase: ...
     def stop(self, database: DisposableDatabase) -> None: ...
 
 

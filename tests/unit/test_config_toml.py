@@ -7,6 +7,7 @@ import pytest
 from pgproof.adapters.repository import config_toml
 from pgproof.adapters.repository.config_toml import read_config, write_config
 from pgproof.domain.config import ProjectConfig, UnsupportedConfigVersionError
+from pgproof.domain.execution import RunnerConfig
 from pgproof.domain.ir.context import AnswerState, ContextIR, TableScale, TenantModel
 from pgproof.domain.questions import (
     CORE_CRITICAL_OPERATIONS,
@@ -131,3 +132,54 @@ def test_an_invalid_tenant_model_value_on_disk_reads_as_unknown(tmp_path: Path) 
     )
     config = read_config(path)
     assert config.context.tenant_model is TenantModel.UNKNOWN
+
+
+# --------------------------------------------------------------------------- #
+# [runner]
+# --------------------------------------------------------------------------- #
+def test_no_runner_table_reads_as_none(tmp_path: Path) -> None:
+    assert read_config(tmp_path / "pgproof.toml").runner is None
+
+
+def test_an_empty_project_config_writes_no_runner_table(tmp_path: Path) -> None:
+    path = tmp_path / "pgproof.toml"
+    write_config(path, ProjectConfig())
+    assert "[runner]" not in path.read_text()
+
+
+def test_writing_then_reading_a_runner_config_round_trips(tmp_path: Path) -> None:
+    runner = RunnerConfig(
+        image="ghcr.io/example/app@sha256:" + "a" * 64,
+        migration_command=("alembic", "upgrade", "head"),
+        database_url_env="DATABASE_URL",
+        environment_allowlist=("APP_ENV",),
+        network=True,
+        cpu=2,
+        memory="2GB",
+        pids=256,
+        timeout_seconds=900,
+    )
+    path = tmp_path / "pgproof.toml"
+    write_config(path, ProjectConfig(runner=runner))
+    reloaded = read_config(path)
+    assert reloaded.runner == runner
+
+
+def test_a_build_based_runner_config_round_trips(tmp_path: Path) -> None:
+    runner = RunnerConfig(build="Dockerfile")
+    path = tmp_path / "pgproof.toml"
+    write_config(path, ProjectConfig(runner=runner))
+    assert read_config(path).runner == runner
+
+
+def test_an_invalid_runner_table_on_disk_raises(tmp_path: Path) -> None:
+    path = tmp_path / "pgproof.toml"
+    path.write_text("config_version = 1\n\n[runner]\ncpu = 1.0\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="image or a build"):
+        read_config(path)
+
+
+def test_the_runner_table_is_not_duplicated_into_extra_sections(tmp_path: Path) -> None:
+    path = tmp_path / "pgproof.toml"
+    write_config(path, ProjectConfig(runner=RunnerConfig(image="alpine:3.19")))
+    assert read_config(path).extra_sections == {}

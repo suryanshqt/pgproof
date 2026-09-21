@@ -25,6 +25,7 @@ class RunnerConfig:
 
     image: str | None = None
     build: str | None = None
+    migration_command: tuple[str, ...] = ()
     database_url_env: str = "DATABASE_URL"
     environment_allowlist: tuple[str, ...] = ()
     network: bool = False
