@@ -71,11 +71,14 @@ jobs:
         run: uv sync --all-groups
 
       - name: Pull the test images
-        # Digest-addressed, matching fixtures/benchmark-corpus.yaml, so this
-        # job and the fixtures job test against the same server build.
+        # Postgres is digest-addressed, matching fixtures/benchmark-corpus.yaml,
+        # so this job and the fixtures job test against the same server build.
+        # python:3.12-slim is the base of fixtures/demo-{broken,clean}/Dockerfile
+        # (BE-18); pulling it here just avoids the first test blocking on it.
         run: |
           docker pull alpine:3.19
           docker pull postgres@sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675
+          docker pull python:3.12-slim
 
       - name: Run the Docker-backed integration suite
         run: uv run pytest tests/integration --no-cov -v

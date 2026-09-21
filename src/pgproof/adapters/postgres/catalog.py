@@ -16,6 +16,11 @@ represented in `indexes`, only as a `ConstraintIR` — matching how
 explicit `op.create_index`, never Postgres's own implicit backing index for
 a constraint, so a live and a statically-reconstructed schema describe the
 same thing the same way.
+
+`SchemaIR.migration_head` (BE-18) is read from the live `alembic_version`
+table — the same field `adapters.repository.alembic_static` already sets
+from a static replay, so a caller checks "did the migration reach the
+expected head" with a plain equality, not a new comparison vocabulary.
 """
 
 from __future__ import annotations
@@ -154,6 +159,22 @@ def _strip_check_expression(definition: str) -> str:
     return definition.removeprefix("CHECK (").removesuffix(")")
 
 
+def _read_migration_head(credentials: GeneratedCredentials) -> str | None:
+    """`None` when the target isn't Alembic-managed at all (no `alembic_version`
+    table) rather than an error — this is a fact about the database, not a
+    failure of introspection. Its own `autocommit` connection, separate from
+    the main introspection one: a missing table would otherwise abort that
+    connection's transaction and fail every query issued after it.
+    """
+    try:
+        with psycopg.connect(credentials.dsn, autocommit=True) as conn, conn.cursor() as cur:
+            cur.execute("SELECT version_num FROM alembic_version LIMIT 1")
+            row = cur.fetchone()
+    except psycopg.errors.UndefinedTable:
+        return None
+    return cast("str", row[0]) if row is not None else None
+
+
 class PsycopgCatalogReader:
     def introspect(self, credentials: GeneratedCredentials) -> SchemaIR:
         with psycopg.connect(credentials.dsn) as conn, conn.cursor() as cur:
@@ -190,6 +211,8 @@ class PsycopgCatalogReader:
             (server_version,) = cast("tuple[str]", cur.fetchone())
             settings = self._settings(cur)
 
+        migration_head = _read_migration_head(credentials)
+
         return SchemaIR(
             provenance=SchemaProvenance.PHYSICAL_CATALOG,
             tables=tuple(tables),
@@ -197,6 +220,7 @@ class PsycopgCatalogReader:
             indexes=tuple(indexes),
             extensions=tuple(sorted(extension_versions)),
             extension_versions=extension_versions,
+            migration_head=migration_head,
             server_version=server_version,
             settings=settings,
             unsupported=tuple(unsupported),

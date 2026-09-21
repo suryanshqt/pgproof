@@ -26,8 +26,11 @@ from pgproof.adapters.runner.docker import (
     RunnerBuildError,
     RunnerUnavailableError,
     _normalize_memory,
+    create_network,
     find_orphaned_containers,
+    find_orphaned_networks,
     remove_containers,
+    remove_network,
     resolve_image,
 )
 from pgproof.domain.execution import RunnerConfig
@@ -165,6 +168,46 @@ def test_remove_containers_force_removes_every_id(monkeypatch: pytest.MonkeyPatc
 
 
 # --------------------------------------------------------------------------- #
+# create_network / find_orphaned_networks / remove_network
+# --------------------------------------------------------------------------- #
+def test_create_network_labels_it_and_makes_it_internal(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = _FakeDocker({"network": [_cp()]})
+    monkeypatch.setattr(docker_module, "_docker", fake)
+    create_network("pgproof-net-abc123")
+    assert fake.calls == [
+        [
+            "network",
+            "create",
+            "--internal",
+            "--label",
+            "pgproof.owner=pgproof",
+            "pgproof-net-abc123",
+        ]
+    ]
+
+
+def test_find_orphaned_networks_parses_names(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = _FakeDocker({"network": [_cp(stdout="pgproof-net-abc\npgproof-net-def\n")]})
+    monkeypatch.setattr(docker_module, "_docker", fake)
+    assert find_orphaned_networks() == ("pgproof-net-abc", "pgproof-net-def")
+
+
+def test_find_orphaned_networks_is_empty_on_a_failed_listing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakeDocker({"network": [_cp(returncode=1)]})
+    monkeypatch.setattr(docker_module, "_docker", fake)
+    assert find_orphaned_networks() == ()
+
+
+def test_remove_network_removes_by_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = _FakeDocker({"network": [_cp()]})
+    monkeypatch.setattr(docker_module, "_docker", fake)
+    remove_network("pgproof-net-abc123")
+    assert fake.calls == [["network", "rm", "pgproof-net-abc123"]]
+
+
+# --------------------------------------------------------------------------- #
 # DockerRunner.run
 # --------------------------------------------------------------------------- #
 def _spec(
@@ -174,6 +217,7 @@ def _spec(
     command: Sequence[str] = ("echo", "hi"),
     environment: Mapping[str, str] | None = None,
     cancel_event: Event | None = None,
+    network: str | None = None,
 ) -> RunSpec:
     return RunSpec(
         source=tmp_path,
@@ -181,6 +225,7 @@ def _spec(
         command=command,
         environment=environment or {},
         cancel_event=cancel_event,
+        network=network,
     )
 
 
@@ -216,6 +261,26 @@ def test_run_stages_a_world_writable_copy_and_removes_it_afterward(
     assert len(staged) == 1
     assert not staged[0].exists()  # cleaned up after the run
     assert source.is_dir()  # the real source is untouched
+
+
+def test_a_named_network_overrides_the_bridge_none_choice(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake = _FakeDocker(
+        {
+            "create": [_cp(stdout="container123\n")],
+            "start": [_cp()],
+            "inspect": [_cp(stdout="false\n"), _cp(stdout="0\n")],
+            "logs": [_cp()],
+            "rm": [_cp()],
+        }
+    )
+    monkeypatch.setattr(docker_module, "_docker", fake)
+    DockerRunner().run(_spec(tmp_path, network="pgproof-net-abc123"))
+    create_call = fake.calls[0]
+    assert "--network" in create_call
+    assert "pgproof-net-abc123" in create_call
+    assert "none" not in create_call
 
 
 def test_run_raises_when_the_daemon_is_unreachable(
@@ -260,6 +325,28 @@ def test_a_successful_run_captures_logs_and_exit_code(
     assert mount != f"{tmp_path}:/workspace:rw"  # a staged copy, never the real source
     assert "-e" in create_call
     assert "APP_ENV=test" in create_call
+    assert "HOME=/workspace" in create_call
+
+
+def test_a_caller_supplied_home_overrides_the_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake = _FakeDocker(
+        {
+            "create": [_cp(stdout="container123\n")],
+            "start": [_cp()],
+            "inspect": [_cp(stdout="false\n"), _cp(stdout="0\n")],
+            "logs": [_cp()],
+            "rm": [_cp()],
+        }
+    )
+    monkeypatch.setattr(docker_module, "_docker", fake)
+    DockerRunner().run(_spec(tmp_path, environment={"HOME": "/custom"}))
+    create_call = fake.calls[0]
+    # Docker itself resolves repeated `-e HOME=...` flags last-wins (verified
+    # directly against a real daemon); the fake args list legitimately
+    # contains both, in the order that makes `/custom` win.
+    assert create_call.index("HOME=/workspace") < create_call.index("HOME=/custom")
     assert fake.calls[-1] == ["rm", "-f", "container123"]
 
 

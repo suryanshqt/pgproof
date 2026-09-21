@@ -16,6 +16,7 @@ from typing import Any
 import tomli_w
 
 from pgproof.domain.config import ProjectConfig
+from pgproof.domain.execution import RunnerConfig
 from pgproof.domain.ir.context import (
     AnswerState,
     ConsistencyRequirement,
@@ -25,7 +26,7 @@ from pgproof.domain.ir.context import (
     TenantModel,
 )
 
-_RESERVED_KEYS = ("config_version", "context")
+_RESERVED_KEYS = ("config_version", "context", "runner")
 
 
 def _context_to_toml(context: ContextIR) -> dict[str, Any]:
@@ -122,6 +123,45 @@ def _toml_to_context(table: dict[str, Any]) -> ContextIR:
     )
 
 
+def _runner_to_toml(runner: RunnerConfig | None) -> dict[str, Any]:
+    """Every field, including ones at their default — `[runner]`, unlike
+    `[context]`, is a cohesive bundle a project sets deliberately, matching
+    `docs/TECHNICAL_DESIGN.md:82-91`'s own fully-explicit example table."""
+    if runner is None:
+        return {}
+    table: dict[str, Any] = {}
+    if runner.image is not None:
+        table["image"] = runner.image
+    if runner.build is not None:
+        table["build"] = runner.build
+    if runner.migration_command:
+        table["migration_command"] = list(runner.migration_command)
+    table["database_url_env"] = runner.database_url_env
+    if runner.environment_allowlist:
+        table["environment_allowlist"] = list(runner.environment_allowlist)
+    table["network"] = runner.network
+    table["cpu"] = runner.cpu
+    table["memory"] = runner.memory
+    table["pids"] = runner.pids
+    table["timeout_seconds"] = runner.timeout_seconds
+    return table
+
+
+def _toml_to_runner(table: dict[str, Any]) -> RunnerConfig:
+    return RunnerConfig(
+        image=table.get("image"),
+        build=table.get("build"),
+        migration_command=tuple(table.get("migration_command", ())),
+        database_url_env=table.get("database_url_env", "DATABASE_URL"),
+        environment_allowlist=tuple(table.get("environment_allowlist", ())),
+        network=table.get("network", False),
+        cpu=table.get("cpu", 1.0),
+        memory=table.get("memory", "512m"),
+        pids=table.get("pids", 128),
+        timeout_seconds=table.get("timeout_seconds", 300),
+    )
+
+
 def read_config(path: Path) -> ProjectConfig:
     """A missing file reads as the all-defaults `ProjectConfig`: `configure` on a
     fresh repository has nothing to fail on, only questions to ask.
@@ -136,9 +176,11 @@ def read_config(path: Path) -> ProjectConfig:
         for key, value in document.items()
         if key not in _RESERVED_KEYS and isinstance(value, dict)
     }
+    raw_runner = document.get("runner")
     return ProjectConfig(
         config_version=version,
         context=_toml_to_context(document.get("context", {})),
+        runner=_toml_to_runner(raw_runner) if raw_runner else None,
         extra_sections=extra_sections,
     )
 
@@ -149,4 +191,7 @@ def write_config(path: Path, config: ProjectConfig) -> None:
     context_table = _context_to_toml(config.context)
     if context_table:
         document["context"] = context_table
+    runner_table = _runner_to_toml(config.runner)
+    if runner_table:
+        document["runner"] = runner_table
     path.write_text(tomli_w.dumps(document), encoding="utf-8")

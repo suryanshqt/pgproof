@@ -106,7 +106,53 @@ def test_start_returns_a_disposable_database_once_ready(monkeypatch: pytest.Monk
     assert database.credentials.port == 54321
     assert database.credentials.user == "pgproof"
     assert database.credentials.database == "pgproof"
+    assert database.internal_credentials is None
     assert fake.calls[0][0] == "run"
+
+
+def test_start_with_a_network_joins_it_and_returns_internal_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakeDocker(
+        {
+            "run": [_cp(stdout="container123\n")],
+            "network": [_cp()],
+            "port": [_cp(stdout="127.0.0.1:54321\n")],
+        }
+    )
+    monkeypatch.setattr(lifecycle_module, "_docker", fake)
+    monkeypatch.setattr(
+        "pgproof.adapters.postgres.lifecycle.psycopg.connect",
+        lambda _dsn, **_kwargs: _FakeConnectionContext(),
+    )
+    database = DockerPostgresLifecycle().start(
+        image="postgres:17", timeout_seconds=5, network="pgproof-net-abc123"
+    )
+    assert database.internal_credentials is not None
+    run_call = fake.calls[0]
+    expected_name = run_call[run_call.index("--name") + 1]
+    assert database.internal_credentials.host == expected_name
+    assert database.internal_credentials.port == 5432
+    assert database.internal_credentials.user == "pgproof"
+    assert ["network", "connect", "pgproof-net-abc123", "container123"] in fake.calls
+
+
+def test_start_cleans_up_and_raises_when_joining_the_network_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakeDocker(
+        {
+            "run": [_cp(stdout="container123\n")],
+            "network": [_cp(returncode=1, stderr="no such network")],
+            "rm": [_cp()],
+        }
+    )
+    monkeypatch.setattr(lifecycle_module, "_docker", fake)
+    with pytest.raises(DatabaseUnavailableError, match="could not join network"):
+        DockerPostgresLifecycle().start(
+            image="postgres:17", timeout_seconds=5, network="pgproof-net-abc123"
+        )
+    assert fake.calls[-1] == ["rm", "-f", "container123"]
 
 
 def test_start_raises_when_the_run_command_fails(monkeypatch: pytest.MonkeyPatch) -> None:

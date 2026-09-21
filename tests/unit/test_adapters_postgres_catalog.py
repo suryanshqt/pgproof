@@ -12,7 +12,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import psycopg
 import pytest
+from typing_extensions import override
 
 from pgproof.adapters.postgres.catalog import PsycopgCatalogReader
 from pgproof.domain.ir.schema import ConstraintKind, ReferentialAction, SortDirection
@@ -116,6 +118,8 @@ def _responder(sql: str, params: tuple[object, ...] | None) -> list[tuple[object
         return [("17.11 (Debian 17.11-1.pgdg13+2)",)]
     if "FROM pg_settings" in sql:
         return [("max_connections", "100", None), ("shared_buffers", "16384", "8kB")]
+    if "FROM alembic_version" in sql:
+        return [("6a912ef4c1b8",)]
     raise AssertionError(f"unexpected query: {sql}")
 
 
@@ -131,7 +135,8 @@ def test_introspect_builds_the_expected_schema_ir(
 ) -> None:
     cursor = _FakeCursor(_responder)
     monkeypatch.setattr(
-        "pgproof.adapters.postgres.catalog.psycopg.connect", lambda _dsn: _FakeConnection(cursor)
+        "pgproof.adapters.postgres.catalog.psycopg.connect",
+        lambda _dsn, **_kwargs: _FakeConnection(cursor),
     )
     schema = PsycopgCatalogReader().introspect(credentials)
 
@@ -171,3 +176,23 @@ def test_introspect_builds_the_expected_schema_ir(
     assert schema.extensions == ("plpgsql",)
     assert schema.server_version == "17.11 (Debian 17.11-1.pgdg13+2)"
     assert schema.settings == {"max_connections": "100", "shared_buffers": "16384 8kB"}
+    assert schema.migration_head == "6a912ef4c1b8"
+
+
+def test_a_missing_alembic_version_table_leaves_migration_head_none(
+    monkeypatch: pytest.MonkeyPatch, credentials: GeneratedCredentials
+) -> None:
+    class _RaisingCursor(_FakeCursor):
+        @override
+        def execute(self, sql: str, params: tuple[object, ...] | None = None) -> None:
+            if "FROM alembic_version" in sql:
+                raise psycopg.errors.UndefinedTable("relation does not exist")
+            super().execute(sql, params)
+
+    cursor = _RaisingCursor(_responder)
+    monkeypatch.setattr(
+        "pgproof.adapters.postgres.catalog.psycopg.connect",
+        lambda _dsn, **_kwargs: _FakeConnection(cursor),
+    )
+    schema = PsycopgCatalogReader().introspect(credentials)
+    assert schema.migration_head is None
