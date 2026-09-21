@@ -58,7 +58,7 @@ export type SchemaVersion = string;
 export type ToolVersion = string;
 
 /**
- * Transport envelope for the pgproof code artifact, contract schema version 1.1.
+ * Transport envelope for the pgproof code artifact, contract schema version 1.2.
  */
 export interface CodeArtifact {
   artifact_type: ArtifactType;

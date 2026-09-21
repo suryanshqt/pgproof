@@ -141,8 +141,9 @@ def test_data_model_for_matches_the_registry() -> None:
 # Version compatibility
 # --------------------------------------------------------------------------- #
 def test_contract_schema_version_is_the_current_minor() -> None:
-    """`migration_plan` (BE-14) landed as a minor bump per ADR 0001 rule 6."""
-    assert CONTRACT_SCHEMA_VERSION == "1.1"
+    """`SchemaIR.extension_versions/server_version/settings` (BE-17) landed as a
+    minor bump per ADR 0001 rule 6: additive, optional, defaulted fields."""
+    assert CONTRACT_SCHEMA_VERSION == "1.2"
     assert SUPPORTED_MAJOR == 1
 
 

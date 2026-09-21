@@ -51,13 +51,13 @@ jobs:
         run: uv run python scripts/generate_contracts.py --check
 
       - name: Test with coverage
-        # tests/integration needs a real Docker daemon (BE-16); macos-15 runners
-        # do not have one. That suite runs, uncapped by the coverage gate below,
-        # in the dedicated runner-integration job instead.
+        # tests/integration needs a real Docker daemon (BE-16, BE-17); macos-15
+        # runners do not have one. That suite runs, uncapped by the coverage
+        # gate below, in the dedicated docker-integration job instead.
         run: uv run pytest tests/unit tests/contract
 
-  runner-integration:
-    name: Runner adversarial tests (Docker)
+  docker-integration:
+    name: Docker integration tests (runner, PostgreSQL)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -70,10 +70,14 @@ jobs:
       - name: Synchronise locked dependencies
         run: uv sync --all-groups
 
-      - name: Pull the test image
-        run: docker pull alpine:3.19
+      - name: Pull the test images
+        # Digest-addressed, matching fixtures/benchmark-corpus.yaml, so this
+        # job and the fixtures job test against the same server build.
+        run: |
+          docker pull alpine:3.19
+          docker pull postgres@sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675
 
-      - name: Run the isolated-runner adversarial suite
+      - name: Run the Docker-backed integration suite
         run: uv run pytest tests/integration --no-cov -v
 
   contracts:

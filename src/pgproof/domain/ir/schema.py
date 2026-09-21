@@ -7,6 +7,8 @@ static reconstruction MUST NOT masquerade as final physical truth.
 
 from __future__ import annotations
 
+from pydantic import Field
+
 from pgproof.domain.identifiers import ColumnId, MigrationId, TableId
 from pgproof.domain.primitives import Contract, NonEmptyText, SnakeCaseEnum
 from pgproof.domain.sources import SourceRef
@@ -126,6 +128,13 @@ class SchemaIR(Contract):
     constraints: tuple[ConstraintIR, ...] = ()
     indexes: tuple[IndexIR, ...] = ()
     extensions: tuple[NonEmptyText, ...] = ()
+    # BE-17: name -> installed version, only ever populated by a live catalog read.
+    extension_versions: dict[str, str] = Field(default_factory=dict)
+    # BE-17: `SHOW server_version`-equivalent; None unless read from a live catalog.
+    server_version: str | None = None
+    # BE-17: a fixed, named set of GUCs a live catalog read captured; see
+    # `adapters/postgres/catalog.py` for exactly which ones and why.
+    settings: dict[str, str] = Field(default_factory=dict)
     migration_head: MigrationId | None = None
     migration_revisions: tuple[MigrationId, ...] = ()
     unsupported: tuple[UnsupportedConstruct, ...] = ()

@@ -329,9 +329,9 @@
       "type": "object"
     }
   },
-  "$id": "https://pgproof.dev/contracts/1.1/code.schema.json",
+  "$id": "https://pgproof.dev/contracts/1.2/code.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Transport envelope for the pgproof code artifact, contract schema version 1.1.",
+  "description": "Transport envelope for the pgproof code artifact, contract schema version 1.2.",
   "properties": {
     "artifact_type": {
       "const": "code",
@@ -361,7 +361,7 @@
       "type": "string"
     },
     "schema_version": {
-      "default": "1.1",
+      "default": "1.2",
       "pattern": "^1\\.(0|[1-9][0-9]*)$",
       "title": "Schema Version",
       "type": "string"

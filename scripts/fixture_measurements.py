@@ -572,7 +572,9 @@ def _environment(dsn: str) -> dict[str, Any]:
         versions[key] = str(module.__version__)
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute("SHOW server_version")
-        server_version = cur.fetchone()[0]
+        row = cur.fetchone()
+        assert row is not None
+        server_version = row[0]
     return {
         "client": versions,
         # platform.node() is deliberately not recorded; it is a machine identifier.
@@ -631,7 +633,9 @@ def collect(args: argparse.Namespace) -> int:
 
         def plan(sql: str, params: list[Any]) -> dict[str, Any]:
             cur.execute(f"EXPLAIN (ANALYZE, BUFFERS, WAL, TIMING OFF, FORMAT JSON) {sql}", params)
-            explain = cur.fetchone()[0]
+            row = cur.fetchone()
+            assert row is not None
+            explain = row[0]
             return {
                 "explain_options": "ANALYZE, BUFFERS, WAL, TIMING OFF, FORMAT JSON",
                 "timing_enabled": False,
@@ -661,7 +665,9 @@ def collect(args: argparse.Namespace) -> int:
                     "SELECT pg_relation_size(%s), pg_size_pretty(pg_relation_size(%s))",
                     (case["index_name"], case["index_name"]),
                 )
-                size_bytes, size_pretty = cur.fetchone()
+                row = cur.fetchone()
+                assert row is not None
+                size_bytes, size_pretty = row
 
                 b_warm, b_samples, _ = timed(case["sql"], case["params"])
                 if run_number == 1:

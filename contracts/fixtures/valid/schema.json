@@ -19,6 +19,9 @@
         "table": "public.orders"
       }
     ],
+    "extension_versions": {
+      "plpgsql": "1.0"
+    },
     "extensions": [
       "plpgsql"
     ],
@@ -47,6 +50,11 @@
       "6a912ef4c1b8"
     ],
     "provenance": "physical_catalog",
+    "server_version": "17.11 (Debian 17.11-1.pgdg13+2)",
+    "settings": {
+      "max_connections": "100",
+      "shared_buffers": "128MB"
+    },
     "tables": [
       {
         "columns": [
@@ -132,6 +140,6 @@
     "repository": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
   },
   "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
-  "schema_version": "1.0",
+  "schema_version": "1.2",
   "tool_version": "0.1.0"
 }

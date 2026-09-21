@@ -43,8 +43,11 @@ _STOP_GRACE_SECONDS = "5"
 _WORKSPACE = "/workspace"
 _DEFAULT_USER = "1000:1000"
 
-_LABEL_OWNER = "pgproof.owner"
-_OWNER_VALUE = "pgproof"
+# Public: every pgproof-owned container, not just the project runner, carries
+# this label, so `find_orphaned_containers` covers the disposable-Postgres
+# containers `adapters.postgres.lifecycle` creates too (BE-17).
+LABEL_OWNER = "pgproof.owner"
+OWNER_VALUE = "pgproof"
 _PS_FORMAT = "{{.ID}}\t{{.Names}}"
 
 _MEMORY_RE = re.compile(r"^(\d+(?:\.\d+)?)\s*([kKmMgG]?)[bB]?$")
@@ -115,7 +118,7 @@ def resolve_image(config: RunnerConfig, root: Path) -> str:
 
 def find_orphaned_containers() -> tuple[OrphanedContainer, ...]:
     result = _docker(
-        ["ps", "-a", "--filter", f"label={_LABEL_OWNER}={_OWNER_VALUE}", "--format", _PS_FORMAT]
+        ["ps", "-a", "--filter", f"label={LABEL_OWNER}={OWNER_VALUE}", "--format", _PS_FORMAT]
     )
     if result.returncode != 0:
         return ()
@@ -155,7 +158,7 @@ class DockerRunner:
                 "--name",
                 f"pgproof-runner-{run_id}",
                 "--label",
-                f"{_LABEL_OWNER}={_OWNER_VALUE}",
+                f"{LABEL_OWNER}={OWNER_VALUE}",
                 "--user",
                 _DEFAULT_USER,
                 "--network",
