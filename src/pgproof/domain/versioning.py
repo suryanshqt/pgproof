@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from typing import Final, NamedTuple
 
-CONTRACT_SCHEMA_VERSION: Final = "1.1"
+CONTRACT_SCHEMA_VERSION: Final = "1.2"
 SUPPORTED_MAJOR: Final = 1
 
 _VERSION = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")

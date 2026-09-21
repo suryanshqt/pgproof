@@ -25,7 +25,7 @@ export type SchemaVersion = string;
 export type ToolVersion = string;
 
 /**
- * Transport envelope for the pgproof migration_plan artifact, contract schema version 1.1.
+ * Transport envelope for the pgproof migration_plan artifact, contract schema version 1.2.
  */
 export interface MigrationPlanArtifact {
   artifact_type: ArtifactType;

@@ -53,6 +53,7 @@ export type Table1 = string;
 export type Indexes = IndexIR[];
 export type MigrationHead = string | null;
 export type MigrationRevisions = string[];
+export type ServerVersion = string | null;
 export type DataType = string;
 export type DefaultExpression = string | null;
 /**
@@ -88,7 +89,7 @@ export type SchemaVersion = string;
 export type ToolVersion = string;
 
 /**
- * Transport envelope for the pgproof schema artifact, contract schema version 1.1.
+ * Transport envelope for the pgproof schema artifact, contract schema version 1.2.
  */
 export interface SchemaArtifact {
   artifact_type: ArtifactType;
@@ -104,11 +105,14 @@ export interface SchemaArtifact {
  */
 export interface SchemaIR {
   constraints?: Constraints;
+  extension_versions?: ExtensionVersions;
   extensions?: Extensions;
   indexes?: Indexes;
   migration_head?: MigrationHead;
   migration_revisions?: MigrationRevisions;
   provenance: SchemaProvenance;
+  server_version?: ServerVersion;
+  settings?: Settings;
   tables?: Tables;
   unsupported?: Unsupported;
 }
@@ -125,6 +129,9 @@ export interface ConstraintIR {
   referenced_table?: ReferencedTable;
   table: Table;
 }
+export interface ExtensionVersions {
+  [k: string]: string;
+}
 export interface IndexIR {
   included_columns?: IncludedColumns;
   introduced_by?: IntroducedBy1;
@@ -140,6 +147,9 @@ export interface IndexKeyIR {
   column?: Column;
   direction?: SortDirection;
   expression?: Expression1;
+}
+export interface Settings {
+  [k: string]: string;
 }
 export interface TableIR {
   columns?: Columns1;

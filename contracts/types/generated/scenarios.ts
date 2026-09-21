@@ -31,7 +31,7 @@ export type SchemaVersion = string;
 export type ToolVersion = string;
 
 /**
- * Transport envelope for the pgproof scenarios artifact, contract schema version 1.1.
+ * Transport envelope for the pgproof scenarios artifact, contract schema version 1.2.
  */
 export interface ScenariosArtifact {
   artifact_type: ArtifactType;

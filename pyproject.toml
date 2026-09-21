@@ -35,6 +35,9 @@ dependencies = [
   "typing-extensions>=4.12",
   # stdlib `tomllib` only reads; this is its write-side complement.
   "tomli-w>=1.0",
+  # BE-17: the disposable-Postgres catalog adapter. Binary build avoids
+  # requiring libpq-dev on every install target.
+  "psycopg[binary]>=3.2",
 ]
 
 [project.urls]
@@ -141,7 +144,7 @@ enable_error_code = [
 # not a pgproof dependency. Its drivers are imported lazily and only resolve
 # inside a fixture environment.
 [[tool.mypy.overrides]]
-module = ["app.*", "psycopg", "sqlalchemy.*"]
+module = ["app.*", "sqlalchemy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

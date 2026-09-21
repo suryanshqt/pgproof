@@ -105,9 +105,11 @@ def test_generated_schemas_carry_no_timestamp_or_machine_data() -> None:
 def test_valid_fixture_validates_against_its_model(artifact_type: ArtifactType) -> None:
     parsed = parse_artifact(valid_fixture(artifact_type))
     assert parsed.artifact_type is artifact_type
-    # Every fixture predating BE-14 is frozen at 1.0; `migration_plan` did not
-    # exist until the 1.1 minor that added it, per ADR 0001 rule 6.
-    assert parsed.schema_version in {"1.0", "1.1"}
+    # Every fixture predating a minor that touched its own artifact type stays
+    # frozen at the version it was written at, per ADR 0001 rule 6: `schema`
+    # moved to 1.2 with BE-17's `extension_versions`/`server_version`/`settings`;
+    # `migration_plan` didn't exist before the 1.1 that added it.
+    assert parsed.schema_version in {"1.0", "1.1", "1.2"}
 
 
 @pytest.mark.parametrize("artifact_type", list(ArtifactType), ids=lambda t: t.value)
