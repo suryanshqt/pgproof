@@ -1,4 +1,4 @@
-"""`DockerPostgresLifecycle` with `docker` replaced by a scripted fake.
+"""`DockerPostgresLifecycle` with `docker`/`psycopg` replaced by scripted fakes.
 
 Real-container behaviour is exercised against an actual Docker daemon in
 `tests/integration/test_postgres_catalog.py`, mirroring
@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import subprocess
 
+import psycopg
 import pytest
 
 from pgproof.adapters.postgres import lifecycle as lifecycle_module
@@ -79,15 +80,26 @@ def test_start_raises_when_the_daemon_is_unreachable(monkeypatch: pytest.MonkeyP
         DockerPostgresLifecycle().start(image="postgres:17", timeout_seconds=5)
 
 
+class _FakeConnectionContext:
+    def __enter__(self) -> _FakeConnectionContext:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+
 def test_start_returns_a_disposable_database_once_ready(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = _FakeDocker(
         {
             "run": [_cp(stdout="container123\n")],
             "port": [_cp(stdout="127.0.0.1:54321\n")],
-            "exec": [_cp()],  # pg_isready succeeds first try
         }
     )
     monkeypatch.setattr(lifecycle_module, "_docker", fake)
+    monkeypatch.setattr(
+        "pgproof.adapters.postgres.lifecycle.psycopg.connect",
+        lambda _dsn, **_kwargs: _FakeConnectionContext(),
+    )
     database = DockerPostgresLifecycle().start(image="postgres:17", timeout_seconds=5)
     assert database.container_id == "container123"
     assert database.credentials.host == "127.0.0.1"
@@ -127,11 +139,15 @@ def test_start_cleans_up_and_raises_when_readiness_never_arrives(
         {
             "run": [_cp(stdout="container123\n")],
             "port": [_cp(stdout="127.0.0.1:54321\n")],
-            "exec": [_cp(returncode=1)] * 5,
             "rm": [_cp()],
         }
     )
     monkeypatch.setattr(lifecycle_module, "_docker", fake)
+
+    def _never_ready(_dsn: str, **_kwargs: object) -> _FakeConnectionContext:
+        raise psycopg.OperationalError("connection refused")
+
+    monkeypatch.setattr("pgproof.adapters.postgres.lifecycle.psycopg.connect", _never_ready)
     monkeypatch.setattr("pgproof.adapters.postgres.lifecycle.time.sleep", lambda _s: None)
     clock = iter([0.0, 0.1, 0.2, 0.3, 5.0])
     monkeypatch.setattr(

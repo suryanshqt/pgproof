@@ -9,6 +9,16 @@ disposable-Postgres container without any changes there.
 
 Bound to `127.0.0.1` only and never given production credentials or data,
 per `docs/PRODUCT_SPEC.md:268` ("no production connection in v1").
+
+Readiness is a real TCP `psycopg.connect()` attempt against the published
+port, not `docker exec ... pg_isready`. The official Postgres image runs a
+*temporary* Unix-socket-only server during `initdb`/init-script execution,
+stops it, then starts the real TCP server; `pg_isready` run inside the
+container can observe the temporary instance as "accepting connections" and
+report ready well before the real server is listening, which surfaced as a
+real, intermittent "server closed the connection unexpectedly" failure on a
+slower CI runner. Probing the exact host:port:credentials path the caller
+will actually use removes the ambiguity about which server instance answered.
 """
 
 from __future__ import annotations
@@ -18,6 +28,8 @@ import subprocess
 import time
 import uuid
 from collections.abc import Sequence
+
+import psycopg
 
 from pgproof.adapters.runner.docker import LABEL_OWNER, OWNER_VALUE, probe_docker
 from pgproof.ports.database import (
@@ -93,7 +105,7 @@ class DockerPostgresLifecycle:
         credentials = GeneratedCredentials(
             host=_HOST, port=port, user=_USER, password=password, database=_DATABASE
         )
-        if not self._wait_until_ready(container_id, timeout_seconds=timeout_seconds):
+        if not self._wait_until_ready(credentials, timeout_seconds=timeout_seconds):
             _docker(["rm", "-f", container_id])
             raise DatabaseUnavailableError(
                 f"PostgreSQL did not become ready within {timeout_seconds}s"
@@ -103,11 +115,14 @@ class DockerPostgresLifecycle:
     def stop(self, database: DisposableDatabase) -> None:
         _docker(["rm", "-f", database.container_id])
 
-    def _wait_until_ready(self, container_id: str, *, timeout_seconds: float) -> bool:
+    def _wait_until_ready(
+        self, credentials: GeneratedCredentials, *, timeout_seconds: float
+    ) -> bool:
         deadline = time.monotonic() + timeout_seconds
         while time.monotonic() < deadline:
-            probe = _docker(["exec", container_id, "pg_isready", "-U", _USER, "-d", _DATABASE])
-            if probe.returncode == 0:
-                return True
-            time.sleep(_POLL_INTERVAL_SECONDS)
+            try:
+                with psycopg.connect(credentials.dsn, connect_timeout=2):
+                    return True
+            except psycopg.OperationalError:
+                time.sleep(_POLL_INTERVAL_SECONDS)
         return False
