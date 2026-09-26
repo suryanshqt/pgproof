@@ -25,6 +25,15 @@ class RunSpec:
     the one way (BE-18) for the runner to reach a disposable PostgreSQL
     container by name on a shared, `--internal` (no route out) network,
     matching `docs/ARCHITECTURE.md`'s "Sandbox" trust-boundary diagram.
+
+    `inject_files` (BE-20) are written into the staged workspace copy, after
+    the caller's own repository is copied there but before the container
+    starts — how a plugin module reaches a container that never had pgproof
+    installed in it. `capture_paths` are workspace-relative files read back
+    out of that same staging copy once the container has stopped, before it
+    is discarded — the one way a runner call can hand back more than
+    stdout/stderr, since the container itself is never reachable from the
+    host filesystem.
     """
 
     source: Path
@@ -33,6 +42,8 @@ class RunSpec:
     environment: Mapping[str, str] = field(default_factory=dict)
     cancel_event: Event | None = None
     network: str | None = None
+    inject_files: Mapping[str, str] = field(default_factory=dict)
+    capture_paths: tuple[str, ...] = ()
 
 
 class Runner(Protocol):

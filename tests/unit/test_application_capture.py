@@ -7,12 +7,14 @@ is the real end-to-end round trip.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from pgproof.application.capture import TestCaptureSpec as CaptureSpec
 from pgproof.application.capture import run_capture
 from pgproof.domain.execution import RunnerConfig, RunOutcome
 from pgproof.domain.ir.code import CodeIR
@@ -47,6 +49,18 @@ class _FakeRunner:
     def run(self, spec: RunSpec) -> RunOutcome:
         self.calls.append(spec)
         return self.outcome
+
+
+@dataclass
+class _FakeSequenceRunner:
+    """One outcome per successive `run()` call — migration, then test phase."""
+
+    outcomes: list[RunOutcome]
+    calls: list[RunSpec] = field(default_factory=list)
+
+    def run(self, spec: RunSpec) -> RunOutcome:
+        self.calls.append(spec)
+        return self.outcomes[len(self.calls) - 1]
 
 
 @dataclass
@@ -207,3 +221,144 @@ def test_the_catalog_is_introspected_using_the_host_facing_credentials() -> None
     )
     run_capture(**_kwargs(catalog_reader=catalog_reader))
     assert catalog_reader.calls == [_HOST_CREDENTIALS]
+
+
+# --------------------------------------------------------------------------- #
+# BE-20: the test phase, when a `TestCaptureSpec` is given
+# --------------------------------------------------------------------------- #
+def _test_capture_spec(**overrides: object) -> CaptureSpec:
+    defaults: dict[str, Any] = {
+        "command": ("pytest", "-q"),
+        "plugin_source": "print('plugin')",
+        "plugin_workspace_path": "_pgproof_capture_plugin.py",
+        "plugin_module_env": "PYTEST_PLUGINS",
+        "plugin_module_name": "_pgproof_capture_plugin",
+        "pythonpath_env": "PYTHONPATH",
+        "capture_file_env": "PGPROOF_CAPTURE_FILE",
+        "capture_file_path": ".pgproof-capture/events.ndjson",
+    }
+    defaults.update(overrides)
+    return CaptureSpec(**defaults)
+
+
+def _event_line(sequence: int) -> str:
+    payload = {
+        "sequence": sequence,
+        "duration_us": 10,
+        "statement": "SELECT 1",
+        "dialect": "postgresql",
+        "parameters": [],
+        "executemany": False,
+        "batch_size": None,
+        "rowcount": 1,
+        "transaction_id": None,
+        "node_id": "tests/test_x.py::test_y",
+        "phase": "call",
+        "call_sites": [],
+        "error_class": None,
+        "process_id": 1,
+        "thread_id": 1,
+        "task_id": None,
+    }
+    return json.dumps(payload)
+
+
+def test_with_no_test_capture_spec_the_runner_only_runs_once() -> None:
+    runner = _FakeRunner(outcome=_SUCCESS)
+    result = run_capture(**_kwargs(runner=runner))
+    assert len(runner.calls) == 1
+    assert result.test_capture is None
+
+
+def test_a_successful_migration_and_test_run_parses_the_captured_events() -> None:
+    capture_path = ".pgproof-capture/events.ndjson"
+    test_outcome = RunOutcome(
+        exit_code=0,
+        timed_out=False,
+        cancelled=False,
+        stdout="",
+        stderr="",
+        duration_seconds=1.0,
+        captured_files={
+            capture_path: (_event_line(1) + "\n" + _event_line(2) + "\n").encode("utf-8")
+        },
+    )
+    runner = _FakeSequenceRunner(outcomes=[_SUCCESS, test_outcome])
+    result = run_capture(
+        **_kwargs(runner=runner, test_capture=_test_capture_spec(capture_file_path=capture_path))
+    )
+    assert len(runner.calls) == 2
+    assert result.test_capture is not None
+    assert result.test_capture.succeeded is True
+    assert [event.sequence for event in result.test_capture.events] == [1, 2]
+    assert result.test_capture.malformed_event_lines == 0
+
+
+def test_the_test_phase_carries_its_plugin_and_capture_env_vars() -> None:
+    runner = _FakeSequenceRunner(outcomes=[_SUCCESS, _SUCCESS])
+    run_capture(**_kwargs(runner=runner, test_capture=_test_capture_spec()))
+    test_spec = runner.calls[1]
+    assert test_spec.command == ("pytest", "-q")
+    assert test_spec.inject_files == {"_pgproof_capture_plugin.py": "print('plugin')"}
+    assert test_spec.capture_paths == (".pgproof-capture/events.ndjson",)
+    assert test_spec.environment["PYTEST_PLUGINS"] == "_pgproof_capture_plugin"
+    assert test_spec.environment["PYTHONPATH"] == "."
+    assert test_spec.environment["PGPROOF_CAPTURE_FILE"] == ".pgproof-capture/events.ndjson"
+    assert test_spec.environment["DATABASE_URL"] == _INTERNAL_CREDENTIALS.dsn
+    assert test_spec.network == "pgproof-net-abc123"
+
+
+def test_a_failed_migration_never_runs_the_test_phase() -> None:
+    runner = _FakeSequenceRunner(outcomes=[_FAILURE])
+    result = run_capture(**_kwargs(runner=runner, test_capture=_test_capture_spec()))
+    assert len(runner.calls) == 1
+    assert result.test_capture is None
+
+
+def test_malformed_capture_lines_are_counted_not_raised() -> None:
+    capture_path = ".pgproof-capture/events.ndjson"
+    test_outcome = RunOutcome(
+        exit_code=0,
+        timed_out=False,
+        cancelled=False,
+        stdout="",
+        stderr="",
+        duration_seconds=1.0,
+        captured_files={capture_path: (_event_line(1) + "\nnot json\n").encode("utf-8")},
+    )
+    runner = _FakeSequenceRunner(outcomes=[_SUCCESS, test_outcome])
+    result = run_capture(
+        **_kwargs(runner=runner, test_capture=_test_capture_spec(capture_file_path=capture_path))
+    )
+    assert result.test_capture is not None
+    assert len(result.test_capture.events) == 1
+    assert result.test_capture.malformed_event_lines == 1
+
+
+def test_a_failed_test_run_still_reports_whatever_was_captured() -> None:
+    capture_path = ".pgproof-capture/events.ndjson"
+    failed_test_outcome = RunOutcome(
+        exit_code=1,
+        timed_out=False,
+        cancelled=False,
+        stdout="",
+        stderr="",
+        duration_seconds=1.0,
+        captured_files={capture_path: (_event_line(1) + "\n").encode("utf-8")},
+    )
+    runner = _FakeSequenceRunner(outcomes=[_SUCCESS, failed_test_outcome])
+    result = run_capture(
+        **_kwargs(runner=runner, test_capture=_test_capture_spec(capture_file_path=capture_path))
+    )
+    assert result.test_capture is not None
+    assert result.test_capture.succeeded is False
+    assert len(result.test_capture.events) == 1
+
+
+def test_the_database_is_stopped_after_a_successful_test_phase_too() -> None:
+    lifecycle = _FakeLifecycle(database=_DATABASE)
+    runner = _FakeSequenceRunner(outcomes=[_SUCCESS, _SUCCESS])
+    run_capture(
+        **_kwargs(runner=runner, database_lifecycle=lifecycle, test_capture=_test_capture_spec())
+    )
+    assert lifecycle.stopped == [_DATABASE]

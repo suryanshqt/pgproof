@@ -250,8 +250,8 @@ def test_run_stages_a_world_writable_copy_and_removes_it_afterward(
     monkeypatch.setattr(docker_module, "_docker", fake)
     real_stage = docker_module._stage_source
 
-    def _spy_stage(src: Path, run_id: str) -> Path:
-        result = real_stage(src, run_id)
+    def _spy_stage(src: Path, run_id: str, inject_files: Mapping[str, str]) -> Path:
+        result = real_stage(src, run_id, inject_files)
         staged.append(result)
         return result
 
@@ -261,6 +261,38 @@ def test_run_stages_a_world_writable_copy_and_removes_it_afterward(
     assert len(staged) == 1
     assert not staged[0].exists()  # cleaned up after the run
     assert source.is_dir()  # the real source is untouched
+
+
+def test_an_injected_file_is_readable_back_via_capture_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """BE-20: `inject_files` writes into the staged workspace before the
+    container starts; `capture_paths` reads back out of that same staged copy
+    after it stops, before it is discarded. Nothing here needs a real
+    container: an unmodified injected file is still present for the readback
+    regardless of what (faked) execution happened in between.
+    """
+    fake = _FakeDocker(
+        {
+            "create": [_cp(stdout="container123\n")],
+            "start": [_cp()],
+            "inspect": [_cp(stdout="false\n"), _cp(stdout="0\n")],
+            "logs": [_cp()],
+            "rm": [_cp()],
+        }
+    )
+    monkeypatch.setattr(docker_module, "_docker", fake)
+    source = tmp_path / "source"
+    source.mkdir()
+    spec = RunSpec(
+        source=source,
+        config=RunnerConfig(image="alpine:3.19"),
+        command=("echo", "hi"),
+        inject_files={"nested/plugin.py": "print('hi')"},
+        capture_paths=("nested/plugin.py", "never-written.ndjson"),
+    )
+    outcome = DockerRunner().run(spec)
+    assert outcome.captured_files == {"nested/plugin.py": b"print('hi')"}
 
 
 def test_a_named_network_overrides_the_bridge_none_choice(

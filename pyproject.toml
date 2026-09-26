@@ -43,6 +43,9 @@ dependencies = [
   # this project's pin everywhere else (fixtures/benchmark-corpus.yaml).
   # 8.x tracks PG18 and is deliberately excluded.
   "pglast>=7.18,<8",
+  # BE-20: the pytest capture plugin's cursor-execute event hooks. Bounded
+  # below v3 to match the fixtures' own pin (`fixtures/demo-broken/pyproject.toml`).
+  "sqlalchemy>=2.0,<3",
 ]
 
 [project.urls]
