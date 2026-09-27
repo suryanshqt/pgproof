@@ -71,6 +71,9 @@ dev = [
   "ruff>=0.9",
   # Starlette's TestClient (used by FastAPI) requires httpx2; test-only.
   "httpx2>=2.13.0",
+  # BE-23: the deterministic generator's accept criterion is property tests
+  # (FK validity, uniqueness, determinism, unrelated-stream stability).
+  "hypothesis>=6.112",
 ]
 
 [tool.hatch.build.targets.wheel]
