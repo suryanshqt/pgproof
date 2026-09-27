@@ -19,6 +19,7 @@ from threading import Event
 import psycopg
 import pytest
 
+from pgproof.adapters.benchmark.explain import parse_explain
 from pgproof.adapters.benchmark.run import CandidateDDL, run_experiment
 from pgproof.adapters.postgres.catalog import PsycopgCatalogReader
 from pgproof.adapters.postgres.lifecycle import DockerPostgresLifecycle
@@ -175,3 +176,22 @@ def test_postgres_settings_are_applied_during_the_run_and_restored_after(
         after = conn.execute("SHOW enable_seqscan").fetchone()
         assert after is not None
         assert after[0] == "on"
+
+
+def test_the_a1_and_b_plans_have_different_fingerprints(
+    seeded: tuple[GeneratedCredentials, SchemaIR],
+) -> None:
+    """BE-26 tied to BE-25's own captured EXPLAIN output: A1 (no index, a real
+    scan of 200,000 rows) and B (the candidate index applied) must not share a
+    plan identity — the exact accept criterion, "join/scan/relation changes
+    alter plan identity," against a real plan instead of a hand-built one.
+    """
+    template, _ = seeded
+    with _fresh(template) as credentials, psycopg.connect(credentials.dsn) as conn:
+        result = run_experiment(conn, _QUERY, _PARAMS, candidate=_INDEX)
+    assert result.explain_a1 is not None
+    assert result.explain_b is not None
+    a1 = parse_explain(result.explain_a1)
+    b = parse_explain(result.explain_b)
+    assert a1.plan_fingerprint != b.plan_fingerprint
+    assert "orders" in a1.normalized_shape
