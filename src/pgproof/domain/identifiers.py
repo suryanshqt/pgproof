@@ -239,6 +239,21 @@ def node_parts(value: str) -> tuple[str, str]:
     return kind, key
 
 
+def operation_id(kind: str, node_id: str, phase: str) -> str:
+    """Operation identity: adapter kind (e.g. `"pytest"`) plus the test node id
+    and phase it correlates to — `docs/TECHNICAL_DESIGN.md` section 12's
+    "primary operation boundary: pytest node id + phase". `node_id` and `phase`
+    are framed rather than delimited, so a node id containing "::" cannot
+    collide with the phase that follows it.
+    """
+    if not re.match(NODE_KIND_PATTERN, kind):
+        raise ValueError(f"not an operation kind: {kind!r}")
+    value = f"{kind}::{frame_components(node_id, phase)}"
+    if not re.match(OPERATION_ID_PATTERN, value):
+        raise ValueError(f"not an operation id: {value!r}")
+    return value
+
+
 def proof_id(recommendation: str, input_manifest_hash: str) -> str:
     """Proof identity is the recommendation plus its input-manifest hash.
 

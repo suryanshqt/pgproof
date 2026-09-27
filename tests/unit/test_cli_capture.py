@@ -6,6 +6,7 @@ isolation `tests/unit/test_application_capture.py` already uses for
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -188,6 +189,12 @@ def test_yes_skips_the_prompt_and_runs_end_to_end(
     assert "Tests: ok" in result.output
     assert "Captured queries: 0" in result.output
     assert (tmp_path / ".pgproof" / "analysis" / "schema.json").is_file()
+    workload_path = tmp_path / ".pgproof" / "analysis" / "workload.json"
+    assert workload_path.is_file()
+    workload_document = json.loads(workload_path.read_text(encoding="utf-8"))
+    assert workload_document["artifact_type"] == "workload"
+    assert workload_document["data"]["queries"] == []
+    assert workload_document["data"]["coverage"] == "complete_for_selection"
 
 
 def test_a_failed_migration_is_reported_and_skips_the_test_phase(
@@ -227,6 +234,11 @@ def test_a_failed_test_run_reports_whatever_was_captured_as_partial(
     assert result.exit_code == 0, result.output
     assert "Tests: failed" in result.output
     assert "Captured queries: 1" in result.output
+    workload_document = json.loads(
+        (tmp_path / ".pgproof" / "analysis" / "workload.json").read_text(encoding="utf-8")
+    )
+    assert workload_document["data"]["coverage"] == "partial"
+    assert len(workload_document["data"]["queries"]) == 1
 
 
 def test_malformed_capture_lines_are_summarized(
@@ -237,6 +249,10 @@ def test_malformed_capture_lines_are_summarized(
     assert result.exit_code == 0, result.output
     assert "Tests: ok" in result.output
     assert "Malformed capture lines: 1" in result.output
+    workload_document = json.loads(
+        (tmp_path / ".pgproof" / "analysis" / "workload.json").read_text(encoding="utf-8")
+    )
+    assert workload_document["data"]["coverage"] == "partial"
 
 
 def test_the_static_schema_with_a_migration_head_is_selected(

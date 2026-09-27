@@ -26,7 +26,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Event
 
-from pgproof.domain.capture_event import CapturedQueryEvent, parse_capture_ndjson
+from pgproof.domain.capture_event import (
+    CapturedQueryEvent,
+    CaptureSummary,
+    parse_capture_ndjson,
+    parse_capture_summary,
+)
 from pgproof.domain.execution import RunnerConfig, RunOutcome
 from pgproof.domain.ir.code import CodeIR
 from pgproof.domain.ir.schema import SchemaIR, UnsupportedConstruct
@@ -55,6 +60,9 @@ class TestCaptureSpec:
     pythonpath_env: str
     capture_file_env: str
     capture_file_path: str
+    # BE-21: sibling of `capture_file_path`, written once at session end —
+    # `adapters.pytest_capture.CAPTURE_SUMMARY_PATH`.
+    summary_file_path: str
 
 
 @dataclass(frozen=True)
@@ -65,6 +73,9 @@ class TestCaptureResult:
     # `docs/PR_ROADMAP.md`'s "failed tests preserve bounded capture" means one
     # bad line must not discard every event captured around it.
     malformed_event_lines: int
+    # BE-21: the all-zero default when the test phase never reached
+    # `pytest_sessionfinish` (crashed, killed, or migrations never ran).
+    summary: CaptureSummary
 
     @property
     def succeeded(self) -> bool:
@@ -201,9 +212,12 @@ def _run_test_phase(
         cancel_event=cancel_event,
         network=network_name,
         inject_files={spec.plugin_workspace_path: spec.plugin_source},
-        capture_paths=(spec.capture_file_path,),
+        capture_paths=(spec.capture_file_path, spec.summary_file_path),
     )
     outcome = runner.run(run_spec)
     raw = outcome.captured_files.get(spec.capture_file_path, b"")
     events, malformed = parse_capture_ndjson(raw)
-    return TestCaptureResult(outcome=outcome, events=events, malformed_event_lines=malformed)
+    summary = parse_capture_summary(outcome.captured_files.get(spec.summary_file_path, b""))
+    return TestCaptureResult(
+        outcome=outcome, events=events, malformed_event_lines=malformed, summary=summary
+    )

@@ -21,6 +21,7 @@ from pgproof.domain.identifiers import (
     frame_components,
     node_id,
     node_parts,
+    operation_id,
     proof_id,
     table_id,
     table_names,
@@ -226,6 +227,18 @@ def test_node_identity_is_kind_plus_domain_identity() -> None:
     assert node_id("table", "public.orders") == "table:public.orders"
     with pytest.raises(ValueError, match="not a node kind"):
         node_id("Table", "public.orders")
+
+
+def test_operation_identity_frames_node_id_and_phase_so_a_double_colon_cannot_collide() -> None:
+    first = operation_id("pytest", "tests/test_x.py::test_a", "call")
+    second = operation_id("pytest", "tests/test_x.py", "test_a::call")
+    assert first != second
+    assert first == 'pytest::["tests/test_x.py::test_a","call"]'
+
+
+def test_operation_identity_rejects_a_malformed_kind() -> None:
+    with pytest.raises(ValueError, match="not an operation kind"):
+        operation_id("Pytest", "tests/test_x.py::test_a", "call")
 
 
 def test_recommendation_identity_ignores_object_order_and_duplicates() -> None:

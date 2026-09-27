@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
 from pgproof.domain.ir.workload import OperationPhase
 from pgproof.domain.primitives import Contract, Microseconds, NonEmptyText, Sha256
@@ -81,3 +81,39 @@ def parse_capture_ndjson(raw: bytes) -> tuple[tuple[CapturedQueryEvent, ...], in
         except (json.JSONDecodeError, ValidationError):
             malformed += 1
     return tuple(events), malformed
+
+
+class CaptureSummary(Contract):
+    """Once-per-session totals, written by the plugin's `pytest_sessionfinish`
+    hook (BE-21) — distinct from the per-query NDJSON stream because a test's
+    pass/fail outcome and a transaction's eventual commit/rollback are both
+    known only at session end, not at any single cursor execution.
+
+    `transaction_outcomes` maps a `CapturedQueryEvent.transaction_id` to
+    whether it committed; a transaction absent here was never explicitly
+    committed or rolled back before the process exited (open at capture end,
+    or handled at the DBAPI level without a matching SQLAlchemy transaction
+    event) and reconstruction treats that the same as rolled back — the same
+    "state the honest boundary, never guess" default `is_redacted=True`
+    already uses elsewhere.
+    """
+
+    selected_tests: int = 0
+    passed_tests: int = 0
+    failed_tests: int = 0
+    transaction_outcomes: dict[NonEmptyText, bool] = Field(default_factory=dict)
+
+
+def parse_capture_summary(raw: bytes) -> CaptureSummary:
+    """A missing or unparseable summary file (migrations failed before the
+    test phase ever started, or the process was killed before
+    `pytest_sessionfinish` ran) returns the all-zero default rather than
+    raising — the same "bounded, never all-or-nothing" contract
+    `parse_capture_ndjson` already holds for the query stream.
+    """
+    if not raw.strip():
+        return CaptureSummary()
+    try:
+        return CaptureSummary.model_validate(json.loads(raw.decode("utf-8")))
+    except (json.JSONDecodeError, ValidationError):
+        return CaptureSummary()
