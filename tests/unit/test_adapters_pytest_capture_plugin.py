@@ -35,9 +35,13 @@ def _enter_call_phase(node_id: str) -> None:
 def _reset_node_state() -> Iterator[None]:
     capture_plugin._state.node_id = None
     capture_plugin._state.phase = None
+    capture_plugin._test_outcomes.clear()
+    capture_plugin._transaction_outcomes.clear()
     yield
     capture_plugin._state.node_id = None
     capture_plugin._state.phase = None
+    capture_plugin._test_outcomes.clear()
+    capture_plugin._transaction_outcomes.clear()
 
 
 @pytest.fixture
@@ -170,3 +174,71 @@ def test_describe_parameters_on_an_executemany_batch_describes_the_first_row() -
 
 def test_content_hash_returns_none_for_an_unreadable_path() -> None:
     assert capture_plugin._content_hash("/does/not/exist.py") is None
+
+
+def _report(nodeid: str, when: str, outcome: str) -> pytest.TestReport:
+    class _FakeReport:
+        def __init__(self) -> None:
+            self.nodeid = nodeid
+            self.when = when
+            self.outcome = outcome
+
+    return cast(pytest.TestReport, _FakeReport())
+
+
+def test_logreport_records_the_call_phase_outcome() -> None:
+    capture_plugin.pytest_runtest_logreport(_report("t.py::a", "call", "passed"))
+    assert capture_plugin._test_outcomes["t.py::a"] == "passed"
+
+
+def test_logreport_records_a_setup_failure_as_failed_without_reaching_call() -> None:
+    capture_plugin.pytest_runtest_logreport(_report("t.py::a", "setup", "failed"))
+    assert capture_plugin._test_outcomes["t.py::a"] == "failed"
+
+
+def test_logreport_a_passing_setup_records_nothing_yet() -> None:
+    capture_plugin.pytest_runtest_logreport(_report("t.py::a", "setup", "passed"))
+    assert "t.py::a" not in capture_plugin._test_outcomes
+
+
+def test_a_committed_transaction_is_recorded_as_committed(engine: Engine) -> None:
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+        transaction_id = str(id(conn.get_transaction()))
+        conn.commit()
+    assert capture_plugin._transaction_outcomes[transaction_id] is True
+
+
+def test_a_rolled_back_transaction_is_recorded_as_not_committed(engine: Engine) -> None:
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+        transaction_id = str(id(conn.get_transaction()))
+        conn.rollback()
+    assert capture_plugin._transaction_outcomes[transaction_id] is False
+
+
+def test_sessionfinish_writes_a_summary_next_to_the_capture_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    capture_file = tmp_path / "events.ndjson"
+    monkeypatch.setenv(CAPTURE_FILE_ENV, str(capture_file))
+    capture_plugin._test_outcomes["t.py::a"] = "passed"
+    capture_plugin._test_outcomes["t.py::b"] = "failed"
+    capture_plugin._transaction_outcomes["123"] = True
+
+    capture_plugin.pytest_sessionfinish(cast(pytest.Session, object()), 1)
+
+    summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
+    assert summary == {
+        "selected_tests": 2,
+        "passed_tests": 1,
+        "failed_tests": 1,
+        "transaction_outcomes": {"123": True},
+    }
+
+
+def test_sessionfinish_without_a_capture_file_env_does_not_raise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(CAPTURE_FILE_ENV, raising=False)
+    capture_plugin.pytest_sessionfinish(cast(pytest.Session, object()), 0)

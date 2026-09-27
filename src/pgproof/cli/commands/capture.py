@@ -22,6 +22,7 @@ from pgproof.adapters.postgres.lifecycle import DockerPostgresLifecycle
 from pgproof.adapters.pytest_capture import (
     CAPTURE_FILE_ENV,
     CAPTURE_FILE_PATH,
+    CAPTURE_SUMMARY_PATH,
     PLUGIN_MODULE_NAME,
     PLUGIN_WORKSPACE_PATH,
     PLUGINS_ENV,
@@ -38,11 +39,18 @@ from pgproof.adapters.runner.docker import (
     remove_network,
     resolve_image,
 )
-from pgproof.application.capture import CaptureResult, TestCaptureSpec, run_capture
+from pgproof.adapters.workload.reconstruct import reconstruct_workload
+from pgproof.application.capture import (
+    CaptureResult,
+    TestCaptureResult,
+    TestCaptureSpec,
+    run_capture,
+)
 from pgproof.cli.commands.inspect import parse_alembic_directories, parse_sqlalchemy_models
 from pgproof.domain.envelope import ArtifactType
 from pgproof.domain.execution import build_execution_contract
 from pgproof.domain.ir.schema import SchemaIR, SchemaProvenance
+from pgproof.domain.ir.workload import WorkloadCoverage
 from pgproof.domain.registry import envelope_model_for
 from pgproof.domain.stages import StageName
 from pgproof.ports.clock import SystemClock
@@ -135,6 +143,7 @@ def capture(
             pythonpath_env=PYTHONPATH_ENV,
             capture_file_env=CAPTURE_FILE_ENV,
             capture_file_path=CAPTURE_FILE_PATH,
+            summary_file_path=CAPTURE_SUMMARY_PATH,
         )
         try:
             result = run_capture(
@@ -188,29 +197,60 @@ def _report_migration(session: RunSession, layout: ProjectLayout, result: Captur
         )
 
 
+def _capture_coverage(test_capture: TestCaptureResult) -> tuple[WorkloadCoverage, str]:
+    if not test_capture.succeeded:
+        return (
+            WorkloadCoverage.PARTIAL,
+            f"test command exited {test_capture.outcome.exit_code}; "
+            f"{len(test_capture.events)} query event(s) captured before it stopped",
+        )
+    if test_capture.malformed_event_lines:
+        return (
+            WorkloadCoverage.PARTIAL,
+            f"{test_capture.malformed_event_lines} capture line(s) failed to parse",
+        )
+    return (
+        WorkloadCoverage.COMPLETE_FOR_SELECTION,
+        "capture completed for the selected test command",
+    )
+
+
 def _report_test_capture(session: RunSession, layout: ProjectLayout, result: CaptureResult) -> None:
     test_capture = result.test_capture
     assert test_capture is not None
+    assert result.physical_schema is not None  # the test phase never runs without one
     session.start_stage(StageName.QUERY_CAPTURE)
     raw = "\n".join(event.canonical_json() for event in test_capture.events)
     write_bytes_atomic(
         layout.run_query_events_path(session.run_id),
         (raw + "\n").encode("utf-8") if raw else b"",
     )
-    if not test_capture.succeeded:
-        session.partial_stage(
-            StageName.QUERY_CAPTURE,
-            boundary_note=(
-                f"test command exited {test_capture.outcome.exit_code}; "
-                f"{len(test_capture.events)} query event(s) captured before it stopped"
-            ),
-        )
-        return
-    if test_capture.malformed_event_lines:
-        session.partial_stage(
-            StageName.QUERY_CAPTURE,
-            boundary_note=f"{test_capture.malformed_event_lines} capture line(s) failed to parse",
-        )
+
+    coverage, boundary_note = _capture_coverage(test_capture)
+    workload = reconstruct_workload(
+        test_capture.events,
+        schema=result.physical_schema,
+        transaction_outcomes=test_capture.summary.transaction_outcomes,
+        coverage=coverage,
+        boundary_note=boundary_note,
+        selected_tests=test_capture.summary.selected_tests,
+        passed_tests=test_capture.summary.passed_tests,
+        failed_tests=test_capture.summary.failed_tests,
+    )
+    envelope_cls = envelope_model_for(ArtifactType.WORKLOAD)
+    envelope = envelope_cls(
+        tool_version=__version__,
+        artifact_type=ArtifactType.WORKLOAD,
+        created_at=format_rfc3339(SystemClock().now()),
+        run_id=session.run_id,
+        data=workload,
+    )
+    session.record_artifact(
+        ArtifactType.WORKLOAD, layout.analysis_path(ArtifactType.WORKLOAD), envelope
+    )
+
+    if coverage is WorkloadCoverage.PARTIAL:
+        session.partial_stage(StageName.QUERY_CAPTURE, boundary_note=boundary_note)
         return
     session.complete_stage(StageName.QUERY_CAPTURE)
 

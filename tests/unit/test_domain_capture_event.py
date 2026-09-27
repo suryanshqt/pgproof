@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import json
 
-from pgproof.domain.capture_event import CapturedQueryEvent, parse_capture_ndjson
+from pgproof.domain.capture_event import (
+    CapturedQueryEvent,
+    CaptureSummary,
+    parse_capture_ndjson,
+    parse_capture_summary,
+)
 from pgproof.domain.ir.workload import OperationPhase
 
 
@@ -89,3 +94,29 @@ def test_parse_ndjson_on_empty_bytes_is_empty_not_an_error() -> None:
     events, malformed = parse_capture_ndjson(b"")
     assert events == ()
     assert malformed == 0
+
+
+def test_parse_summary_reads_totals_and_transaction_outcomes() -> None:
+    raw = json.dumps(
+        {
+            "selected_tests": 3,
+            "passed_tests": 2,
+            "failed_tests": 1,
+            "transaction_outcomes": {"140222": True, "140223": False},
+        }
+    ).encode("utf-8")
+    summary = parse_capture_summary(raw)
+    assert summary == CaptureSummary(
+        selected_tests=3,
+        passed_tests=2,
+        failed_tests=1,
+        transaction_outcomes={"140222": True, "140223": False},
+    )
+
+
+def test_parse_summary_on_empty_bytes_is_the_all_zero_default() -> None:
+    assert parse_capture_summary(b"") == CaptureSummary()
+
+
+def test_parse_summary_on_malformed_json_is_the_all_zero_default() -> None:
+    assert parse_capture_summary(b"not json") == CaptureSummary()

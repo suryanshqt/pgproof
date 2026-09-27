@@ -236,6 +236,7 @@ def _test_capture_spec(**overrides: object) -> CaptureSpec:
         "pythonpath_env": "PYTHONPATH",
         "capture_file_env": "PGPROOF_CAPTURE_FILE",
         "capture_file_path": ".pgproof-capture/events.ndjson",
+        "summary_file_path": ".pgproof-capture/summary.json",
     }
     defaults.update(overrides)
     return CaptureSpec(**defaults)
@@ -294,13 +295,73 @@ def test_a_successful_migration_and_test_run_parses_the_captured_events() -> Non
     assert result.test_capture.malformed_event_lines == 0
 
 
+def test_when_no_summary_file_was_captured_the_summary_defaults_to_zero() -> None:
+    capture_path = ".pgproof-capture/events.ndjson"
+    test_outcome = RunOutcome(
+        exit_code=0,
+        timed_out=False,
+        cancelled=False,
+        stdout="",
+        stderr="",
+        duration_seconds=1.0,
+        captured_files={capture_path: (_event_line(1) + "\n").encode("utf-8")},
+    )
+    runner = _FakeSequenceRunner(outcomes=[_SUCCESS, test_outcome])
+    result = run_capture(
+        **_kwargs(runner=runner, test_capture=_test_capture_spec(capture_file_path=capture_path))
+    )
+    assert result.test_capture is not None
+    assert result.test_capture.summary.selected_tests == 0
+    assert result.test_capture.summary.transaction_outcomes == {}
+
+
+def test_the_summary_file_is_parsed_into_the_test_capture_result() -> None:
+    capture_path = ".pgproof-capture/events.ndjson"
+    summary_path = ".pgproof-capture/summary.json"
+    summary_payload = json.dumps(
+        {
+            "selected_tests": 3,
+            "passed_tests": 2,
+            "failed_tests": 1,
+            "transaction_outcomes": {"1": True},
+        }
+    ).encode("utf-8")
+    test_outcome = RunOutcome(
+        exit_code=0,
+        timed_out=False,
+        cancelled=False,
+        stdout="",
+        stderr="",
+        duration_seconds=1.0,
+        captured_files={capture_path: b"", summary_path: summary_payload},
+    )
+    runner = _FakeSequenceRunner(outcomes=[_SUCCESS, test_outcome])
+    result = run_capture(
+        **_kwargs(
+            runner=runner,
+            test_capture=_test_capture_spec(
+                capture_file_path=capture_path, summary_file_path=summary_path
+            ),
+        )
+    )
+    assert result.test_capture is not None
+    summary = result.test_capture.summary
+    assert summary.selected_tests == 3
+    assert summary.passed_tests == 2
+    assert summary.failed_tests == 1
+    assert summary.transaction_outcomes == {"1": True}
+
+
 def test_the_test_phase_carries_its_plugin_and_capture_env_vars() -> None:
     runner = _FakeSequenceRunner(outcomes=[_SUCCESS, _SUCCESS])
     run_capture(**_kwargs(runner=runner, test_capture=_test_capture_spec()))
     test_spec = runner.calls[1]
     assert test_spec.command == ("pytest", "-q")
     assert test_spec.inject_files == {"_pgproof_capture_plugin.py": "print('plugin')"}
-    assert test_spec.capture_paths == (".pgproof-capture/events.ndjson",)
+    assert test_spec.capture_paths == (
+        ".pgproof-capture/events.ndjson",
+        ".pgproof-capture/summary.json",
+    )
     assert test_spec.environment["PYTEST_PLUGINS"] == "_pgproof_capture_plugin"
     assert test_spec.environment["PYTHONPATH"] == "."
     assert test_spec.environment["PGPROOF_CAPTURE_FILE"] == ".pgproof-capture/events.ndjson"

@@ -13,6 +13,11 @@ PLUGIN_MODULE_NAME: Final = "_pgproof_capture_plugin"
 PLUGIN_WORKSPACE_PATH: Final = f"{PLUGIN_MODULE_NAME}.py"
 CAPTURE_FILE_PATH: Final = ".pgproof-capture/events.ndjson"
 CAPTURE_FILE_ENV: Final = "PGPROOF_CAPTURE_FILE"
+# BE-21: written once, at `pytest_sessionfinish`, alongside `CAPTURE_FILE_PATH`
+# rather than through `CAPTURE_FILE_ENV` — its own path is derived from that
+# same env var inside the plugin (`plugin._summary_path`), so no second env
+# var is needed to locate it.
+CAPTURE_SUMMARY_PATH: Final = ".pgproof-capture/summary.json"
 UNSAFE_VALUES_ENV: Final = "PGPROOF_CAPTURE_UNSAFE_VALUES"
 PLUGINS_ENV: Final = "PYTEST_PLUGINS"
 PYTHONPATH_ENV: Final = "PYTHONPATH"

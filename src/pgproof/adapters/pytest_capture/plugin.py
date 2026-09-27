@@ -40,6 +40,13 @@ _sequence_lock = threading.Lock()
 _sequence = 0
 _write_lock = threading.Lock()
 _content_hash_cache: dict[str, str] = {}
+# BE-21: session-lifetime state, flushed once by `pytest_sessionfinish` into
+# `CaptureSummary` (`docs/TECHNICAL_DESIGN.md` section 12's transaction
+# correlation and the roadmap's "coverage-boundary metrics") — distinct from
+# the per-query NDJSON stream because both are known only at session end.
+_test_outcomes: dict[str, str] = {}
+_transaction_outcomes: dict[str, bool] = {}
+_summary_lock = threading.Lock()
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
@@ -55,6 +62,27 @@ def pytest_runtest_call(item: pytest.Item) -> None:
 def pytest_runtest_teardown(item: pytest.Item) -> None:
     _state.node_id = item.nodeid
     _state.phase = "teardown"
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    if report.when == "call":
+        _test_outcomes[report.nodeid] = report.outcome
+    elif report.when == "setup" and report.outcome == "failed":
+        # The test never reached `call` at all; `setdefault` so a later
+        # `call` report (there won't be one) could never overwrite this.
+        _test_outcomes.setdefault(report.nodeid, "failed")
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    del session, exitstatus
+    _write_summary(
+        {
+            "selected_tests": len(_test_outcomes),
+            "passed_tests": sum(1 for o in _test_outcomes.values() if o == "passed"),
+            "failed_tests": sum(1 for o in _test_outcomes.values() if o == "failed"),
+            "transaction_outcomes": dict(_transaction_outcomes),
+        }
+    )
 
 
 def _current_node() -> tuple[str | None, str | None]:
@@ -158,6 +186,19 @@ def _write_event(payload: dict[str, object]) -> None:
         os.fsync(handle.fileno())
 
 
+def _write_summary(payload: dict[str, object]) -> None:
+    raw_path = os.environ.get(_CAPTURE_FILE_ENV)
+    if not raw_path:
+        return
+    # Sibling of the events file, not a second env var: the events path is
+    # already resolved by the time a session ends.
+    summary_path = Path(raw_path).with_name("summary.json")
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")), encoding="utf-8"
+    )
+
+
 def _base_payload(
     *, statement: str, dialect: str, parameters: object, executemany: bool, duration_us: int
 ) -> dict[str, object] | None:
@@ -227,6 +268,26 @@ def _after_cursor_execute(
     payload["transaction_id"] = str(id(transaction)) if transaction is not None else None
     payload["error_class"] = None
     _write_event(payload)
+
+
+@event.listens_for(Engine, "commit")
+def _on_commit(conn: Connection) -> None:
+    _record_transaction_outcome(conn, committed=True)
+
+
+@event.listens_for(Engine, "rollback")
+def _on_rollback(conn: Connection) -> None:
+    _record_transaction_outcome(conn, committed=False)
+
+
+def _record_transaction_outcome(conn: Connection, *, committed: bool) -> None:
+    # Fires before the DBAPI commit/rollback itself, so the transaction being
+    # acted on is still the one `get_transaction()` returns.
+    transaction = conn.get_transaction()
+    if transaction is None:
+        return
+    with _summary_lock:
+        _transaction_outcomes[str(id(transaction))] = committed
 
 
 @event.listens_for(Engine, "handle_error")
