@@ -32,7 +32,7 @@ import subprocess
 import tempfile
 import time
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from pgproof.domain.execution import RunnerConfig, RunOutcome
@@ -164,12 +164,25 @@ def remove_network(name: str) -> None:
     _docker(["network", "rm", name])
 
 
-def _stage_source(source: Path, run_id: str) -> Path:
+def _stage_source(source: Path, run_id: str, inject_files: Mapping[str, str]) -> Path:
     staging = Path(tempfile.mkdtemp(prefix=f"pgproof-runner-{run_id}-"))
     shutil.copytree(source, staging, dirs_exist_ok=True)
+    for relative_path, text in inject_files.items():
+        destination = staging / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(text, encoding="utf-8")
     for path in (staging, *staging.rglob("*")):
         path.chmod(0o777)
     return staging
+
+
+def _read_captured_files(staging: Path, capture_paths: Sequence[str]) -> dict[str, bytes]:
+    captured: dict[str, bytes] = {}
+    for relative_path in capture_paths:
+        source_path = staging / relative_path
+        if source_path.is_file():
+            captured[relative_path] = source_path.read_bytes()
+    return captured
 
 
 class DockerRunner:
@@ -179,7 +192,7 @@ class DockerRunner:
         image = resolve_image(spec.config, spec.source)
         run_id = uuid.uuid4().hex[:12]
         memory = _normalize_memory(spec.config.memory)
-        staging = _stage_source(spec.source, run_id)
+        staging = _stage_source(spec.source, run_id, spec.inject_files)
         try:
             create_args = [
                 "create",
@@ -227,9 +240,13 @@ class DockerRunner:
                 )
             container_id = created.stdout.strip()
             try:
-                return self._run_created_container(container_id, spec)
+                outcome = self._run_created_container(container_id, spec)
             finally:
                 _docker(["rm", "-f", container_id])
+            if not spec.capture_paths:
+                return outcome
+            captured = _read_captured_files(staging, spec.capture_paths)
+            return dataclasses.replace(outcome, captured_files=captured)
         finally:
             shutil.rmtree(staging, ignore_errors=True)
 

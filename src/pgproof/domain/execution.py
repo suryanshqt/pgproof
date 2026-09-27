@@ -11,8 +11,8 @@ finished run writes): this is a pre-execution approval value, never persisted.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 
 # `docs/TECHNICAL_DESIGN.md:130` requires "safe minimums/maximums" without
 # naming numbers; four hours is pgproof's own chosen ceiling.
@@ -84,6 +84,9 @@ class RunOutcome:
     stdout: str
     stderr: str
     duration_seconds: float
+    # BE-20: `RunSpec.capture_paths` that existed in the staged workspace when
+    # the container stopped, keyed by that same workspace-relative path.
+    captured_files: Mapping[str, bytes] = field(default_factory=dict)
 
     @property
     def succeeded(self) -> bool:

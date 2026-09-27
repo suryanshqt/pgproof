@@ -3,6 +3,7 @@
 import click
 
 from pgproof import __version__
+from pgproof.cli.commands.capture import capture
 from pgproof.cli.commands.clean import clean
 from pgproof.cli.commands.configure import configure
 from pgproof.cli.commands.doctor import doctor
@@ -41,6 +42,7 @@ def main(ctx: click.Context, force_ascii: bool, verbose: bool) -> None:
     ctx.obj["verbose"] = verbose
 
 
+main.add_command(capture)
 main.add_command(clean)
 main.add_command(configure)
 main.add_command(doctor)

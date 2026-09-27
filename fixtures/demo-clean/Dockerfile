@@ -12,4 +12,7 @@ RUN pip install --no-cache-dir uv
 WORKDIR /build
 COPY pyproject.toml uv.lock ./
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
-RUN uv sync --frozen --no-dev
+# BE-20: the dev group carries `pytest`, needed in the baked venv itself so
+# `pgproof capture`'s test phase (not just its migration phase) can run
+# inside this same container.
+RUN uv sync --frozen

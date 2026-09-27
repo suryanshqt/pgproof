@@ -89,6 +89,13 @@ class ProjectLayout:
     def run_events_path(self, run_id: str) -> Path:
         return self.run_dir(run_id) / "events.ndjson"
 
+    def run_query_events_path(self, run_id: str) -> Path:
+        """Raw `CapturedQueryEvent` NDJSON (BE-20), distinct from `events.ndjson`'s
+        `StageEvent` stream. Not a versioned artifact: BE-21 is what turns this
+        into the registered `workload.json` contract.
+        """
+        return self.run_dir(run_id) / "query-events.ndjson"
+
     def run_result_path(self, run_id: str) -> Path:
         return self.run_dir(run_id) / "result.json"
 
