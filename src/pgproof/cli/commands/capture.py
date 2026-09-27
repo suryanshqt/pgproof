@@ -39,6 +39,7 @@ from pgproof.adapters.runner.docker import (
     remove_network,
     resolve_image,
 )
+from pgproof.adapters.workload.amplification import annotate_amplifications
 from pgproof.adapters.workload.reconstruct import reconstruct_workload
 from pgproof.application.capture import (
     CaptureResult,
@@ -237,6 +238,7 @@ def _report_test_capture(session: RunSession, layout: ProjectLayout, result: Cap
         passed_tests=test_capture.summary.passed_tests,
         failed_tests=test_capture.summary.failed_tests,
     )
+    workload = annotate_amplifications(test_capture.events, workload, schema=result.physical_schema)
     envelope_cls = envelope_model_for(ArtifactType.WORKLOAD)
     envelope = envelope_cls(
         tool_version=__version__,
