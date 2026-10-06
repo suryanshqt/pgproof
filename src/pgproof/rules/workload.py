@@ -23,6 +23,7 @@ from pgproof.domain.recommendations import (
     RecommendationSet,
 )
 from pgproof.rules.base import RuleContext
+from pgproof.rules.proposed_tests import ProposedTestKind, render_test_sketch
 
 RULE_ID = "workload.unindexed_foreign_key"
 _UNRESOLVED_INDEX_MARKER = "create_index"
@@ -87,6 +88,11 @@ def unindexed_foreign_key(ctx: RuleContext) -> RecommendationSet:
                 proposed_change=ProposedChange(
                     kind=ChangeKind.ADD_INDEX,
                     summary=f"Add a btree index on {table_name}.{column_name}.",
+                    test_sketch=render_test_sketch(
+                        ProposedTestKind.CATALOG,
+                        table=table_name,
+                        index_columns=(column_name,),
+                    ),
                 ),
             )
         )

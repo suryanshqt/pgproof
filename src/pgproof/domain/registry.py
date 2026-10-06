@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Final, Literal
 
+from pgproof.domain.decisions import DecisionLog
 from pgproof.domain.envelope import ArtifactType, Envelope
 from pgproof.domain.evidence import EvidenceGraph
 from pgproof.domain.experiments import ProofSummarySet
@@ -38,6 +39,7 @@ ARTIFACT_MODELS: Final[dict[ArtifactType, type[Contract]]] = {
     ArtifactType.STAGES: StageSet,
     ArtifactType.PROOFS: ProofSummarySet,
     ArtifactType.MIGRATION_PLAN: MigrationPlan,
+    ArtifactType.DECISIONS: DecisionLog,
 }
 
 
@@ -90,6 +92,10 @@ class MigrationPlanEnvelope(Envelope[MigrationPlan]):
     artifact_type: Literal[ArtifactType.MIGRATION_PLAN]
 
 
+class DecisionsEnvelope(Envelope[DecisionLog]):
+    artifact_type: Literal[ArtifactType.DECISIONS]
+
+
 ENVELOPE_MODELS: Final[dict[ArtifactType, type[Envelope[Any]]]] = {
     ArtifactType.SCHEMA: SchemaEnvelope,
     ArtifactType.CODE: CodeEnvelope,
@@ -102,6 +108,7 @@ ENVELOPE_MODELS: Final[dict[ArtifactType, type[Envelope[Any]]]] = {
     ArtifactType.STAGES: StagesEnvelope,
     ArtifactType.PROOFS: ProofsEnvelope,
     ArtifactType.MIGRATION_PLAN: MigrationPlanEnvelope,
+    ArtifactType.DECISIONS: DecisionsEnvelope,
 }
 
 # The registry is the single source of truth for what a top-level artifact is,

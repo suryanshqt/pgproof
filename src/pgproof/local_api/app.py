@@ -6,10 +6,10 @@ context/decision writes) and forbidden (arbitrary file access, accepting a
 database URL, returning private bind values). Every route here reads or
 writes only through `pgproof.store`, never a raw path the caller supplies.
 
-`project.json`, `/proofs/{id}`, and `/decisions/{id}` have no domain model or
-store location yet (`docs/PR_ROADMAP.md`: BE-04, BE-30, BE-33 respectively)
-and answer `501` by name rather than a bare `404`, so the gap is visible
-rather than looking like a typo'd URL.
+`project.json` and `/proofs/{id}` have no domain model or store location yet
+(`docs/PR_ROADMAP.md`: BE-04, BE-30 respectively) and answer `501` by name
+rather than a bare `404`, so the gap is visible rather than looking like a
+typo'd URL.
 """
 
 from __future__ import annotations
@@ -21,16 +21,21 @@ from typing import Any, Final
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import ValidationError
 
+from pgproof.domain.decisions import Decision, DecisionLog, latest_decision
 from pgproof.domain.envelope import ArtifactType
-from pgproof.domain.registry import parse_artifact
+from pgproof.domain.recommendations import RecommendationSet
+from pgproof.domain.registry import envelope_model_for, parse_artifact
 from pgproof.local_api.security import (
     OriginCheckMiddleware,
     SecurityHeadersMiddleware,
     require_session_token,
 )
-from pgproof.store.artifacts import read_artifact, write_artifact
+from pgproof.ports.clock import SystemClock
+from pgproof.store.artifacts import content_hash, read_artifact, write_artifact
 from pgproof.store.paths import ProjectLayout
+from pgproof.store.run import format_rfc3339
 
 _STATIC_DIR: Final = Path(__file__).parent / "static"
 
@@ -134,10 +139,68 @@ def put_context(document: dict[str, Any], request: Request) -> dict[str, Any]:
     return envelope.canonical_dict()
 
 
+def _read_decision_log(path: Path) -> DecisionLog:
+    if not path.is_file():
+        return DecisionLog()
+    envelope = read_artifact(path, ArtifactType.DECISIONS)
+    log: DecisionLog = envelope.data
+    return log
+
+
+@api_router.get("/decisions/{decision_id}")
+def get_decision(decision_id: str, request: Request) -> dict[str, Any]:
+    log = _read_decision_log(_layout(request).decisions_path)
+    decision = latest_decision(log, decision_id)
+    if decision is None:
+        raise HTTPException(
+            status_code=404, detail=f"recommendation {decision_id!r} has not been decided yet"
+        )
+    return decision.model_dump(mode="json")
+
+
 @api_router.put("/decisions/{decision_id}")
-def put_decision(decision_id: str, document: dict[str, Any]) -> None:
-    del decision_id, document
-    raise HTTPException(status_code=501, detail="decisions.json is not yet implemented (BE-33)")
+def put_decision(decision_id: str, document: dict[str, Any], request: Request) -> dict[str, Any]:
+    """`docs/ARCHITECTURE.md` section 9: a decision write is validated against
+    the recommendation it names, and `input_manifest_hash` is computed here
+    from the current recommendations artifact's own bytes, never accepted
+    from the caller, so a decision cannot be recorded against evidence the
+    server never actually read.
+    """
+    layout = _layout(request)
+    recommendations_path = layout.analysis_path(ArtifactType.RECOMMENDATIONS)
+    if not recommendations_path.is_file():
+        raise HTTPException(status_code=404, detail="recommendations have not been produced yet")
+    recommendations_envelope = read_artifact(recommendations_path, ArtifactType.RECOMMENDATIONS)
+    recommendation_set: RecommendationSet = recommendations_envelope.data
+    known_ids = {recommendation.id for recommendation in recommendation_set.recommendations}
+    if decision_id not in known_ids:
+        raise HTTPException(status_code=404, detail=f"unknown recommendation {decision_id!r}")
+
+    now = format_rfc3339(SystemClock().now())
+    try:
+        decision = Decision(
+            recommendation=decision_id,
+            kind=document["kind"],
+            reason=document["reason"],
+            revisit_condition=document.get("revisit_condition"),
+            decided_at=now,
+            input_manifest_hash=content_hash(recommendations_envelope.canonical_json()),
+        )
+    except (KeyError, ValidationError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    log = _read_decision_log(layout.decisions_path)
+    updated_log = DecisionLog(decisions=(*log.decisions, decision))
+    envelope_cls = envelope_model_for(ArtifactType.DECISIONS)
+    envelope = envelope_cls(
+        tool_version=recommendations_envelope.tool_version,
+        artifact_type=ArtifactType.DECISIONS,
+        created_at=now,
+        run_id=recommendations_envelope.run_id,
+        data=updated_log,
+    )
+    write_artifact(layout.decisions_path, envelope)
+    return decision.model_dump(mode="json")
 
 
 def create_app(*, layout: ProjectLayout, session_token: str, allowed_origin: str) -> FastAPI:

@@ -112,6 +112,7 @@ class ProposedChange(Contract):
     migration_sketch: NonEmptyText | None = None
     application_sketch: NonEmptyText | None = None
     rollback_note: NonEmptyText | None = None
+    test_sketch: NonEmptyText | None = None
 
 
 class FixtureMeasurement(Contract):

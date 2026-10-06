@@ -50,7 +50,8 @@
           "migration_sketch": null,
           "rollback_note": "Drop the constraint.",
           "sql_sketch": "ALTER TABLE orders ADD CONSTRAINT fk_orders_tenant_id FOREIGN KEY (tenant_id) REFERENCES tenants (id);",
-          "summary": "Add fk_orders_tenant_id."
+          "summary": "Add fk_orders_tenant_id.",
+          "test_sketch": null
         },
         "rule": "schema_integrity.orm_relationship_without_physical_fk",
         "rule_version": 1,
@@ -92,7 +93,8 @@
           "migration_sketch": null,
           "rollback_note": null,
           "sql_sketch": "CREATE INDEX ix_orders_tenant_status_created ON orders (tenant_id, status, created_at DESC);",
-          "summary": "Create ix_orders_tenant_status_created."
+          "summary": "Create ix_orders_tenant_status_created.",
+          "test_sketch": null
         },
         "rule": "workload_index.missing_composite_for_filter_and_order",
         "rule_version": 1,

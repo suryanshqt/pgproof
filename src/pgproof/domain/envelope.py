@@ -40,6 +40,7 @@ class ArtifactType(SnakeCaseEnum):
     STAGES = "stages"
     PROOFS = "proofs"
     MIGRATION_PLAN = "migration_plan"
+    DECISIONS = "decisions"
 
 
 DataT = TypeVar("DataT", bound=Contract)

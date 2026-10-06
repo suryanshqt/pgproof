@@ -220,10 +220,99 @@ def test_put_context_rejects_a_malformed_document(tmp_path: Path) -> None:
     assert client.put("/api/v1/context", json={"not": "an envelope"}).status_code == 422
 
 
-def test_put_decision_is_not_yet_implemented(tmp_path: Path) -> None:
+def _recommendations_envelope(recommendation_id: str = "IDX-001") -> Envelope[Any]:
+    envelope_cls = envelope_model_for(ArtifactType.RECOMMENDATIONS)
+    return envelope_cls(
+        tool_version="0.1.0",
+        artifact_type=ArtifactType.RECOMMENDATIONS,
+        created_at="2026-01-01T00:00:00Z",
+        run_id=_RUN,
+        data={
+            "recommendations": [
+                {
+                    "id": recommendation_id,
+                    "rule": "workload.unindexed_foreign_key",
+                    "rule_version": 1,
+                    "title": "Index orders.user_id",
+                    "priority": "worth_evaluating",
+                    "category": "query",
+                    "statement": "orders.user_id is a foreign key with no covering index.",
+                    "affected_objects": ["public.orders.user_id"],
+                    "proposed_change": {"kind": "add_index", "summary": "Add a btree index."},
+                }
+            ]
+        },
+    )
+
+
+def test_getting_a_decision_before_any_exist_is_a_404(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
-    response = client.put("/api/v1/decisions/some-id", json={"anything": True})
-    assert response.status_code == 501
+    assert client.get("/api/v1/decisions/IDX-001").status_code == 404
+
+
+def test_put_decision_rejects_an_unknown_recommendation(tmp_path: Path) -> None:
+    client, layout = _client(tmp_path)
+    write_artifact(layout.analysis_path(ArtifactType.RECOMMENDATIONS), _recommendations_envelope())
+    response = client.put(
+        "/api/v1/decisions/IDX-999", json={"kind": "deferred", "reason": "not now"}
+    )
+    assert response.status_code == 404
+
+
+def test_put_decision_requires_recommendations_to_already_exist(tmp_path: Path) -> None:
+    client, _ = _client(tmp_path)
+    response = client.put(
+        "/api/v1/decisions/IDX-001", json={"kind": "deferred", "reason": "not now"}
+    )
+    assert response.status_code == 404
+
+
+def test_put_decision_rejects_an_unknown_decision_kind(tmp_path: Path) -> None:
+    client, layout = _client(tmp_path)
+    write_artifact(layout.analysis_path(ArtifactType.RECOMMENDATIONS), _recommendations_envelope())
+    response = client.put("/api/v1/decisions/IDX-001", json={"kind": "bogus", "reason": "not now"})
+    assert response.status_code == 422
+
+
+def test_put_decision_rejects_a_missing_reason(tmp_path: Path) -> None:
+    client, layout = _client(tmp_path)
+    write_artifact(layout.analysis_path(ArtifactType.RECOMMENDATIONS), _recommendations_envelope())
+    response = client.put("/api/v1/decisions/IDX-001", json={"kind": "deferred"})
+    assert response.status_code == 422
+
+
+def test_put_decision_records_and_returns_the_decision(tmp_path: Path) -> None:
+    client, layout = _client(tmp_path)
+    write_artifact(layout.analysis_path(ArtifactType.RECOMMENDATIONS), _recommendations_envelope())
+    response = client.put(
+        "/api/v1/decisions/IDX-001",
+        json={"kind": "deferred", "reason": "revisit after the next load test"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["recommendation"] == "IDX-001"
+    assert body["kind"] == "deferred"
+    assert body["input_manifest_hash"].startswith("sha256:")
+    assert layout.decisions_path.is_file()
+
+    stored = client.get("/api/v1/decisions/IDX-001")
+    assert stored.status_code == 200
+    assert stored.json() == body
+
+
+def test_put_decision_appends_rather_than_overwrites_the_log(tmp_path: Path) -> None:
+    client, layout = _client(tmp_path)
+    write_artifact(
+        layout.analysis_path(ArtifactType.RECOMMENDATIONS),
+        _recommendations_envelope("IDX-001"),
+    )
+    client.put("/api/v1/decisions/IDX-001", json={"kind": "deferred", "reason": "first pass"})
+    second = client.put(
+        "/api/v1/decisions/IDX-001", json={"kind": "accepted", "reason": "re-decided"}
+    )
+    assert second.status_code == 200
+    latest = client.get("/api/v1/decisions/IDX-001")
+    assert latest.json()["kind"] == "accepted"
 
 
 @pytest.mark.parametrize("method", ["get", "put"])

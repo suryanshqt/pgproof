@@ -568,9 +568,9 @@ def test_artifact_type_is_the_additive_registry_not_a_semantic_enum() -> None:
     """Rule 6: a new artifact kind may land as a minor, so it is listed separately."""
     assert "ArtifactType" not in CLOSED_SEMANTIC_ENUMS
     # The kinds the roadmap still has to add. Their absence is exactly why rule 6
-    # exists: a blanket major-only rule would have forced a bump to finish BE-04
-    # and BE-33. `migration_plan` (BE-14) is implemented as of this PR.
-    planned_later = {"project", "decisions"}
+    # exists: a blanket major-only rule would have forced a bump to finish BE-04.
+    # `migration_plan` (BE-14) and `decisions` (BE-33) are implemented as of this PR.
+    planned_later = {"project"}
     assert planned_later & {item.value for item in ArtifactType} == set()
 
 

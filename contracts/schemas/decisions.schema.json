@@ -1,0 +1,131 @@
+{
+  "$defs": {
+    "Decision": {
+      "description": "One decision against one recommendation.",
+      "properties": {
+        "decided_at": {
+          "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$",
+          "title": "Decided At",
+          "type": "string"
+        },
+        "input_manifest_hash": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Input Manifest Hash",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/DecisionKind"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "recommendation": {
+          "pattern": "^[A-Z][A-Z0-9]{1,15}-[0-9]{3,6}$",
+          "title": "Recommendation",
+          "type": "string"
+        },
+        "revisit_condition": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revisit Condition"
+        }
+      },
+      "required": [
+        "recommendation",
+        "kind",
+        "reason",
+        "decided_at",
+        "input_manifest_hash"
+      ],
+      "title": "Decision",
+      "type": "object"
+    },
+    "DecisionKind": {
+      "enum": [
+        "accepted",
+        "rejected",
+        "deferred"
+      ],
+      "title": "DecisionKind",
+      "type": "string"
+    },
+    "DecisionLog": {
+      "description": "Every decision made so far. Local project data, never telemetry.",
+      "properties": {
+        "decisions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Decision"
+          },
+          "title": "Decisions",
+          "type": "array"
+        }
+      },
+      "title": "DecisionLog",
+      "type": "object"
+    }
+  },
+  "$id": "https://pgproof.dev/contracts/1.3/decisions.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Transport envelope for the pgproof decisions artifact, contract schema version 1.3.",
+  "properties": {
+    "artifact_type": {
+      "const": "decisions",
+      "title": "Artifact Type",
+      "type": "string"
+    },
+    "created_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in 'Z'.",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z$",
+      "title": "Created At",
+      "type": "string"
+    },
+    "data": {
+      "$ref": "#/$defs/DecisionLog"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Inputs",
+      "type": "object"
+    },
+    "run_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.3",
+      "pattern": "^1\\.(0|[1-9][0-9]*)$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[.\\-+][0-9A-Za-z.\\-+]+)?$",
+      "title": "Tool Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool_version",
+    "artifact_type",
+    "created_at",
+    "run_id",
+    "data"
+  ],
+  "title": "DecisionsArtifact",
+  "type": "object"
+}

@@ -68,6 +68,7 @@ export type MigrationSketch = string | null;
 export type RollbackNote = string | null;
 export type SqlSketch = string | null;
 export type Summary1 = string;
+export type TestSketch = string | null;
 export type Rule = string;
 export type RuleVersion = number;
 export type Statement1 = string;
@@ -195,6 +196,7 @@ export interface ProposedChange {
   rollback_note?: RollbackNote;
   sql_sketch?: SqlSketch;
   summary: Summary1;
+  test_sketch?: TestSketch;
 }
 /**
  * A cost accepted in exchange for the benefit.
