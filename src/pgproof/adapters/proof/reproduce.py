@@ -25,7 +25,7 @@ from typing import Any
 import psycopg
 
 from pgproof.adapters.benchmark.explain import parse_explain
-from pgproof.adapters.benchmark.run import CandidateDDL, run_experiment
+from pgproof.adapters.benchmark.run import CandidateDDL, ExperimentResult, run_experiment
 from pgproof.adapters.postgres.catalog import PsycopgCatalogReader
 from pgproof.adapters.proof.bundle import BundleContents, read_proof_bundle
 from pgproof.adapters.seeder.load import load_dataset
@@ -106,6 +106,50 @@ def _bind_parameters(parameters: Mapping[str, object]) -> dict[str, object] | No
     return resolved
 
 
+def _candidate_from_config(config: Mapping[str, Any]) -> tuple[CandidateDDL, Mapping[str, str]]:
+    candidate_config: Mapping[str, Any] = config.get("candidate", {})
+    candidate = CandidateDDL(
+        apply_sql=candidate_config.get("apply_sql", "SELECT 1"),
+        revert_sql=candidate_config.get("revert_sql", "SELECT 1"),
+    )
+    postgres_settings: Mapping[str, str] = config.get("postgres_settings", {})
+    return candidate, postgres_settings
+
+
+def _evaluate(contents: BundleContents, new_result: ExperimentResult) -> ReproductionResult:
+    """The qualitative comparison section 26 describes, isolated from the
+    database work that produces `new_result` — fully unit-testable against a
+    hand-built `ExperimentResult`, the same pattern
+    `adapters.candidates.verify._read_benefit_verified` already uses.
+    """
+    new_ratio_positive = new_result.ratio is not None and new_result.ratio > 1.0
+    original_positive = _original_direction(contents.evidence)
+    direction_matches = (
+        None if original_positive is None else original_positive == new_ratio_positive
+    )
+
+    recorded_fingerprint = _recorded_plan_fingerprint(contents.plans)
+    plan_shape_compatible: bool | None = None
+    if recorded_fingerprint is not None and new_result.explain_b is not None:
+        new_fingerprint = parse_explain(new_result.explain_b).plan_fingerprint
+        plan_shape_compatible = new_fingerprint == recorded_fingerprint
+
+    stable = not new_result.inconclusive
+    reproduced = direction_matches is True and stable and plan_shape_compatible is not False
+
+    return ReproductionResult(
+        proof_id=contents.manifest.proof_id,
+        tampered=False,
+        tamper_problems=(),
+        schema_version_compatible=True,
+        parameters_available=True,
+        direction_matches=direction_matches,
+        plan_shape_compatible=plan_shape_compatible,
+        stable=stable,
+        reproduced=reproduced,
+    )
+
+
 def _apply_dataset(
     conn: psycopg.Connection[tuple[object, ...]],
     contents: BundleContents,
@@ -172,12 +216,7 @@ def reproduce_bundle(
     config = contents.config
     if not isinstance(config, Mapping):
         raise ValueError("config.yaml must be a mapping")
-    candidate_config: Mapping[str, Any] = config.get("candidate", {})
-    candidate = CandidateDDL(
-        apply_sql=candidate_config.get("apply_sql", "SELECT 1"),
-        revert_sql=candidate_config.get("revert_sql", "SELECT 1"),
-    )
-    postgres_settings: Mapping[str, str] = config.get("postgres_settings", {})
+    candidate, postgres_settings = _candidate_from_config(config)
 
     new_result = run_experiment(
         conn,
@@ -186,30 +225,4 @@ def reproduce_bundle(
         candidate=candidate,
         postgres_settings=postgres_settings,
     )
-
-    new_ratio_positive = new_result.ratio is not None and new_result.ratio > 1.0
-    original_positive = _original_direction(contents.evidence)
-    direction_matches = (
-        None if original_positive is None else original_positive == new_ratio_positive
-    )
-
-    recorded_fingerprint = _recorded_plan_fingerprint(contents.plans)
-    plan_shape_compatible: bool | None = None
-    if recorded_fingerprint is not None and new_result.explain_b is not None:
-        new_fingerprint = parse_explain(new_result.explain_b).plan_fingerprint
-        plan_shape_compatible = new_fingerprint == recorded_fingerprint
-
-    stable = not new_result.inconclusive
-    reproduced = direction_matches is True and stable and plan_shape_compatible is not False
-
-    return ReproductionResult(
-        proof_id=contents.manifest.proof_id,
-        tampered=False,
-        tamper_problems=(),
-        schema_version_compatible=True,
-        parameters_available=True,
-        direction_matches=direction_matches,
-        plan_shape_compatible=plan_shape_compatible,
-        stable=stable,
-        reproduced=reproduced,
-    )
+    return _evaluate(contents, new_result)
