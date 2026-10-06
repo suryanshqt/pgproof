@@ -46,6 +46,8 @@ dependencies = [
   # BE-20: the pytest capture plugin's cursor-execute event hooks. Bounded
   # below v3 to match the fixtures' own pin (`fixtures/demo-broken/pyproject.toml`).
   "sqlalchemy>=2.0,<3",
+  # BE-30: the proof bundle's dataset.yaml/config.yaml on-disk format.
+  "pyyaml>=6.0",
 ]
 
 [project.urls]
@@ -65,7 +67,8 @@ dev = [
   "pytest>=8.3",
   "pytest-cov>=6.0",
   "jsonschema>=4.23",
-  "pyyaml>=6.0",
+  # BE-30 promoted pyyaml itself to [project.dependencies]; its stub package
+  # stays dev-only.
   "types-PyYAML>=6.0",
   "types-jsonschema>=4.23",
   "ruff>=0.9",
