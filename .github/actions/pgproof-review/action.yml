@@ -1,0 +1,104 @@
+# Composite GitHub Action: `pgproof review` + `pgproof share`, with a
+# changed-decisions-only PR comment. No account or API key required beyond
+# the job's own GITHUB_TOKEN.
+#
+# pgproof is not yet published to PyPI (docs/PR_ROADMAP.md BE-34), so this
+# installs it from source at `pgproof-ref` rather than from a package index.
+# ponytail: swap this for `uv tool install pgproof==X` once published; the
+# `pgproof-ref` input and the extra checkout step below are the part to drop.
+name: "pgproof review"
+description: "Run pgproof's parse-only design review and post a changed-decisions-only PR comment."
+inputs:
+  path:
+    description: "Path to the repository to review, relative to the workspace."
+    required: false
+    default: "."
+  pgproof-ref:
+    description: "Git ref of suryanshqt/pgproof to install pgproof from."
+    required: false
+    default: "main"
+  github-token:
+    description: "Token used to post the PR comment."
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: "composite"
+  steps:
+    - name: Check out pgproof
+      uses: actions/checkout@v4
+      with:
+        repository: suryanshqt/pgproof
+        ref: ${{ inputs.pgproof-ref }}
+        path: .pgproof-tool
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    - name: Install pgproof
+      shell: bash
+      run: uv tool install "$GITHUB_WORKSPACE/.pgproof-tool"
+
+    - name: Run pgproof review
+      shell: bash
+      run: pgproof review "${{ inputs.path }}"
+
+    - name: Fetch the base branch's decisions, if any
+      shell: bash
+      run: |
+        set -euo pipefail
+        : > base-decisions.json
+        if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+          git show "${{ github.event.pull_request.base.sha }}:${{ inputs.path }}/.pgproof/decisions.json" \
+            > base-decisions.json 2>/dev/null || true
+        fi
+
+    - name: Build the share bundle
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -s base-decisions.json ]; then
+          pgproof share "${{ inputs.path }}" --base-decisions base-decisions.json
+        else
+          pgproof share "${{ inputs.path }}"
+        fi
+
+    - name: Upload the static report
+      uses: actions/upload-artifact@v4
+      with:
+        name: pgproof-static-report
+        path: ${{ inputs.path }}/.pgproof/share/
+
+    - name: Post the changed-decisions comment
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require("fs");
+          const commentPath = `${{ inputs.path }}/.pgproof/share/pr_comment.md`;
+          if (!fs.existsSync(commentPath)) {
+            return;
+          }
+          const marker = "<!-- pgproof-review-comment -->";
+          const body = `${marker}\n${fs.readFileSync(commentPath, "utf8")}`;
+          const comments = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.data.find((comment) => comment.body.includes(marker));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+          }
