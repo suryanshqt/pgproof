@@ -69,6 +69,7 @@ def test_an_uncovered_foreign_key_is_reported() -> None:
     assert rec.priority is RecommendationPriority.WORTH_EVALUATING
     assert rec.affected_objects == (column_id(table_id("public", "orders"), "user_id"),)
     assert rec.proposed_change is not None
+    assert rec.proposed_change.test_sketch is not None
     assert "user_id" in rec.proposed_change.test_sketch
 
 
