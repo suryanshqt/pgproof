@@ -29,6 +29,7 @@ _MAX_CANDIDATES: Final = 5
 class IndexCandidate:
     table: TableId
     columns: tuple[ColumnId, ...]
+    name: str
     apply_sql: str
     revert_sql: str
     supports: tuple[ExtractedPredicate, ...]
@@ -162,11 +163,12 @@ def generate_candidates(
                     DiscardedCandidate(table=table, columns=columns, reason="over_candidate_budget")
                 )
                 continue
-            _, apply_sql, revert_sql = _ddl(table, columns)
+            name, apply_sql, revert_sql = _ddl(table, columns)
             candidates.append(
                 IndexCandidate(
                     table=table,
                     columns=columns,
+                    name=name,
                     apply_sql=apply_sql,
                     revert_sql=revert_sql,
                     supports=supports,
