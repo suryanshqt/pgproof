@@ -1,0 +1,21 @@
+# Example only: how a consuming repository would call the composite action
+# at .github/actions/pgproof-review. Not wired to any trigger here — copy
+# this into the consumer's own `.github/workflows/`.
+name: pgproof review (example)
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pgproof-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: suryanshqt/pgproof/.github/actions/pgproof-review@main
