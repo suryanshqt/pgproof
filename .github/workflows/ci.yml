@@ -228,6 +228,49 @@ jobs:
           psql -d postgres -c 'DROP DATABASE IF EXISTS demo_broken;' || true
           psql -d postgres -c 'DROP DATABASE IF EXISTS demo_clean;' || true
 
+  ui:
+    name: Frontend (lint, unit, visual)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ui
+
+      - name: Lint
+        run: npm run lint
+        working-directory: ui
+
+      - name: Type-check and build
+        run: npm run build
+        working-directory: ui
+
+      - name: Unit tests
+        run: npm run test
+        working-directory: ui
+
+      - name: Install Playwright's browser
+        run: npx playwright install --with-deps chromium
+        working-directory: ui
+
+      - name: Visual regression tests
+        run: npm run test:visual
+        working-directory: ui
+
+      - name: Upload the Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: ui/playwright-report/
+
   package:
     name: Package build and wheel install
     runs-on: ubuntu-latest

@@ -111,6 +111,11 @@ reviewed, not silently regenerated.
 Fixtures under `contracts/fixtures/` are **committed data, not build output**. A
 model change that breaks one is meant to fail the suite. Edit them by hand.
 
+The local browser UI lives under `ui/`; see [`ui/README.md`](ui/README.md) for
+its own commands (`npm run dev`, `npm run lint`, `npm run test`,
+`npm run test:visual`). `ui/src/contract/` is the only module that imports the
+generated TypeScript types above, so a contract change surfaces there first.
+
 Contract versioning is governed by
 [ADR 0001](docs/adr/0001-contract-versioning.md). A major bump requires a new ADR.
 

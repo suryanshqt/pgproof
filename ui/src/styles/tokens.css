@@ -1,0 +1,88 @@
+/* Design tokens: docs/INTERFACE_DESIGN.md section 13.
+ *
+ * Components consume these semantic names, never a raw palette value
+ * (section 13). Theme resolution follows three states: an explicit choice
+ * stamps data-theme="dark"/"light" on the root; the default "system" setting
+ * stamps nothing and only prefers-color-scheme decides. Density follows the
+ * same pattern via data-density, section 3's "optional compact density".
+ *
+ * Every text/surface pairing below is contrast-checked in
+ * tests/tokens.contrast.test.ts against WCAG 2.2 AA (4.5:1 normal text).
+ */
+
+:root {
+  --surface-page: #ffffff;
+  --surface-base: #f6f7f8;
+  --surface-raised: #ffffff;
+  --text-primary: #16181d;
+  --text-secondary: #4b505a;
+  --border-subtle: #dde0e5;
+  --accent-primary: #0b6aa8;
+  --accent-soft: #e2f0fa;
+  --semantic-success: #157f3c;
+  --semantic-warning: #8a5a00;
+  --semantic-danger: #b3261e;
+  --semantic-info: #0b6aa8;
+  --code-surface: #f4f3ee;
+  --code-text: #16181d;
+
+  --radius-small: 4px;
+  --radius-medium: 8px;
+  --radius-large: 12px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface-page: #15171c;
+    --surface-base: #1b1e24;
+    --surface-raised: #20232b;
+    --text-primary: #edf0f3;
+    --text-secondary: #aeb3bd;
+    --border-subtle: #30343d;
+    --accent-primary: #6db2ec;
+    --accent-soft: #1b3850;
+    --semantic-success: #57c784;
+    --semantic-warning: #e2ab49;
+    --semantic-danger: #ea7069;
+    --semantic-info: #6db2ec;
+    --code-surface: #1e212a;
+    --code-text: #edf0f3;
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface-page: #15171c;
+  --surface-base: #1b1e24;
+  --surface-raised: #20232b;
+  --text-primary: #edf0f3;
+  --text-secondary: #aeb3bd;
+  --border-subtle: #30343d;
+  --accent-primary: #6db2ec;
+  --accent-soft: #1b3850;
+  --semantic-success: #57c784;
+  --semantic-warning: #e2ab49;
+  --semantic-danger: #ea7069;
+  --semantic-info: #6db2ec;
+  --code-surface: #1e212a;
+  --code-text: #edf0f3;
+}
+
+:root[data-density="compact"] {
+  --space-1: 2px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+}
