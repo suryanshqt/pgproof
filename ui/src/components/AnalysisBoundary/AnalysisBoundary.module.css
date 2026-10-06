@@ -1,0 +1,30 @@
+.line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+}
+
+.glyph {
+  font-family: ui-monospace, monospace;
+  width: 1.5ch;
+  text-align: center;
+}
+
+.line[data-mark="ok"] .glyph {
+  color: var(--semantic-success);
+}
+
+.line[data-mark="attention"] .glyph {
+  color: var(--semantic-warning);
+}
+
+.line[data-mark="failure"] .glyph {
+  color: var(--semantic-danger);
+}
+
+.line[data-mark="unavailable"] .glyph {
+  color: var(--text-secondary);
+}

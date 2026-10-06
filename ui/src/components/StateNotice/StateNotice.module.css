@@ -1,0 +1,26 @@
+.notice {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-medium);
+  padding: var(--space-4);
+  background: var(--surface-base);
+}
+
+.notice[data-kind="failure"] {
+  border-color: var(--semantic-danger);
+}
+
+.title {
+  margin: 0;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.notice[data-kind="failure"] .title {
+  color: var(--semantic-danger);
+}
+
+.body {
+  margin-top: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
