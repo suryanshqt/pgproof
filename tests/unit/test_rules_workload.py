@@ -68,6 +68,8 @@ def test_an_uncovered_foreign_key_is_reported() -> None:
     assert rec.category is RecommendationCategory.QUERY
     assert rec.priority is RecommendationPriority.WORTH_EVALUATING
     assert rec.affected_objects == (column_id(table_id("public", "orders"), "user_id"),)
+    assert rec.proposed_change is not None
+    assert "user_id" in rec.proposed_change.test_sketch
 
 
 def test_a_foreign_key_with_a_covering_index_is_not_reported() -> None:

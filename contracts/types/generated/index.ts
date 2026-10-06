@@ -6,6 +6,7 @@
 
 export type { CodeArtifact } from "./code.js";
 export type { ContextArtifact } from "./context.js";
+export type { DecisionsArtifact } from "./decisions.js";
 export type { EvidenceArtifact } from "./evidence.js";
 export type { GraphArtifact } from "./graph.js";
 export type { MigrationPlanArtifact } from "./migration_plan.js";

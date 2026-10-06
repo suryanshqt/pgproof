@@ -8,9 +8,9 @@
   runs/<run-id>/{manifest.json, events.ndjson, result.json}
 ```
 
-`project.json`, `decisions.json` and `proofs/` have no domain model yet
-(BE-04 and BE-33 respectively per `docs/PR_ROADMAP.md`) and are deliberately
-absent here.
+`project.json` and `proofs/` have no domain model yet (BE-04 per
+`docs/PR_ROADMAP.md`) and are deliberately absent here. `decisions.json`
+(BE-33) is now `decisions_path` below.
 
 Directories and files are created owner-only: `docs/ARCHITECTURE.md` section 7
 requires private values to be stored with restrictive permissions, and nothing
@@ -65,6 +65,10 @@ class ProjectLayout:
     @property
     def context_path(self) -> Path:
         return self.pgproof_dir / "context.json"
+
+    @property
+    def decisions_path(self) -> Path:
+        return self.pgproof_dir / "decisions.json"
 
     def analysis_path(self, artifact_type: ArtifactType) -> Path:
         try:

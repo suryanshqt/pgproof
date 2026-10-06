@@ -1,0 +1,22 @@
+{
+  "artifact_type": "decisions",
+  "created_at": "2026-01-01T00:00:00Z",
+  "data": {
+    "decisions": [
+      {
+        "decided_at": "2026-01-01T00:00:00Z",
+        "input_manifest_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "kind": "deferred",
+        "reason": "Revisit after the next load test confirms read volume.",
+        "recommendation": "IDX-002",
+        "revisit_condition": "Peak read volume on orders exceeds current fixture scale."
+      }
+    ]
+  },
+  "inputs": {
+    "recommendations": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "run_id": "01JQ0X3M4N5P6R7S8T9V0W1X2Y",
+  "schema_version": "1.0",
+  "tool_version": "0.1.0"
+}
